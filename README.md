@@ -2,7 +2,7 @@
 
 Uma ferramenta web moderna e intuitiva para visualização e planejamento de Estações Rádio Base (ERB) e Pontos de Interesse (POI) em mapas interativos.
 
-![Mapa do Projeto](screenshots/preview.png) *(Nota: Adicione uma captura de tela aqui para melhor visualização)*
+![Mapa do Projeto](screenshots/preview.jpg)
 
 ## 🚀 Funcionalidades
 
