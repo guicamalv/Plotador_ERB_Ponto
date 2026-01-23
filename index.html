@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plotador de ERBs e Pontos</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="dark-theme">
+    <div id="map"></div>
+
+    <!-- Show Panel Button (Hidden by default) -->
+    <button id="show-all" class="floating-btn hidden-all" title="Mostrar Controles">
+        <i class="fas fa-eye"></i>
+    </button>
+
+    <div class="control-panel glass" id="sidebar">
+        <header>
+            <h1>Plotador de ERBs e Pontos</h1>
+
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Buscar endereço...">
+            <button id="search-btn" title="Buscar"><i class="fas fa-search"></i></button>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="erb-tab">ERBs</button>
+            <button class="tab-btn" data-tab="poi-tab">Pontos (POI)</button>
+        </div>
+
+        <!-- ERB Tab Content -->
+        <div id="erb-tab" class="tab-content active">
+            <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
+            <form id="erb-form">
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="lat">Latitude</label>
+                        <input type="number" id="lat" step="any" placeholder="-23.5505" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="lng">Longitude</label>
+                        <input type="number" id="lng" step="any" placeholder="-46.6333" required>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="azimuth">Azimute (°)</label>
+                        <input type="number" id="azimuth" min="0" max="360" placeholder="90" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="radius">Raio (m)</label>
+                        <input type="number" id="radius" min="1" value="1000" required>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="beamwidth">Abertura (°)</label>
+                        <input type="number" id="beamwidth" min="1" max="360" value="120" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="erb-color">Cor</label>
+                        <input type="color" id="erb-color" value="#ffcb00">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="name">Nome / ID ERB</label>
+                    <input type="text" id="name" placeholder="ERB_01">
+                </div>
+
+                <button type="submit" class="btn-primary">Plotar ERB</button>
+            </form>
+        </div>
+
+        <!-- POI Tab Content -->
+        <div id="poi-tab" class="tab-content">
+            <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
+            <form id="poi-form">
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="poi-lat">Latitude</label>
+                        <input type="number" id="poi-lat" step="any" placeholder="Clique no mapa..." required>
+                    </div>
+                    <div class="input-group">
+                        <label for="poi-lng">Longitude</label>
+                        <input type="number" id="poi-lng" step="any" placeholder="Clique no mapa..." required>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="poi-name">Nome do Ponto</label>
+                        <input type="text" id="poi-name" placeholder="Ponto_A" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="poi-color">Cor</label>
+                        <input type="color" id="poi-color" value="#ff4757">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Ícone do Ponto</label>
+                    <div class="icon-selector" id="poi-icon-selector">
+                        <button type="button" class="icon-btn active" data-icon="location-dot" title="Localização"><i
+                                class="fas fa-location-dot"></i></button>
+                        <button type="button" class="icon-btn" data-icon="house" title="Residência/Local"><i
+                                class="fas fa-house"></i></button>
+                        <button type="button" class="icon-btn" data-icon="user" title="Pessoa (Suspeito/Vítima)"><i
+                                class="fas fa-user"></i></button>
+                        <button type="button" class="icon-btn" data-icon="car" title="Veículo"><i
+                                class="fas fa-car"></i></button>
+                        <button type="button" class="icon-btn" data-icon="person-falling" title="Corpo"><i
+                                class="fas fa-person-falling"></i></button>
+                        <button type="button" class="icon-btn" data-icon="gun" title="Arma de Fogo"><i
+                                class="fas fa-gun"></i></button>
+                        <button type="button" class="icon-btn" data-icon="hand-fist" title="Agressão/Violência"><i
+                                class="fas fa-hand-fist"></i></button>
+                        <button type="button" class="icon-btn" data-icon="handcuffs" title="Algemas"><i
+                                class="fas fa-handcuffs"></i></button>
+                        <button type="button" class="icon-btn" data-icon="pills" title="Drogas/Entorpecentes"><i
+                                class="fas fa-pills"></i></button>
+                        <button type="button" class="icon-btn" data-icon="camera" title="Câmera/Foto"><i
+                                class="fas fa-camera"></i></button>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Adicionar Ponto</button>
+            </form>
+        </div>
+
+        <div class="action-buttons">
+            <div class="row">
+                <button type="button" id="export-btn" class="btn-action" title="Baixar dados em Excel">
+                    <i class="fas fa-file-excel"></i> Exportar
+                </button>
+                <button type="button" id="import-btn" class="btn-action" title="Carregar dados do Excel">
+                    <i class="fas fa-file-import"></i> Importar
+                </button>
+            </div>
+            <div class="row">
+                <button type="button" id="measure-btn" class="btn-action" title="Medir distância">
+                    <i class="fas fa-ruler"></i> Medir
+                </button>
+                <button type="button" id="clear-all" class="btn-action btn-danger-outline"
+                    title="Apagar todos os elementos">
+                    <i class="fas fa-trash-can"></i> Limpar Tudo
+                </button>
+            </div>
+            <input type="file" id="file-input" accept=".xlsx, .xls" style="display: none;">
+        </div>
+
+        <!-- Coordinates Display -->
+        <div class="coords-display" id="coords-display">
+            Lat: 0.000000 | Lng: 0.000000
+        </div>
+
+        <button id="toggle-panel" class="btn-toggle-main">
+            <i class="fas fa-eye-slash"></i> Ocultar Menus
+        </button>
+    </div>
+
+    <div class="right-panel glass" id="right-sidebar">
+        <div class="list-container">
+            <div class="list-header">
+                <h3>Elementos Plotados</h3>
+                <span id="element-count">0</span>
+            </div>
+            <div class="list-search">
+                <input type="text" id="elements-search" placeholder="Filtrar elementos...">
+            </div>
+            <ul id="elements-list">
+                <!-- Items will be added here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- SheetJS for Excel Support -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
