@@ -67,7 +67,15 @@ const closeRightPanelBtn = document.getElementById('close-right-panel');
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const measureBtn = document.getElementById('measure-btn');
-const coordsDisplay = document.getElementById('coords-display');
+const timeSliderContainer = document.getElementById('time-slider-container');
+const timeSlider = document.getElementById('time-slider');
+const currentTimeDisplay = document.getElementById('current-time-display');
+const sliderPrevBtn = document.getElementById('slider-prev');
+const sliderNextBtn = document.getElementById('slider-next');
+
+let showAllTimestamps = false;
+let allLabelsVisible = true;
+let currentSliderTimestamp = null;
 
 // Global Event Listeners
 if (elementsSearchInput) {
@@ -90,6 +98,7 @@ toggleBtn.addEventListener('click', () => {
     sidebar.classList.add('hidden');
     rightSidebar.classList.add('force-hidden');
     showAllBtn.classList.add('visible');
+    timeSliderContainer.classList.add('force-hidden');
 });
 
 // Show Panel (Show All)
@@ -97,6 +106,7 @@ showAllBtn.addEventListener('click', () => {
     sidebar.classList.remove('hidden');
     rightSidebar.classList.remove('force-hidden');
     showAllBtn.classList.remove('visible');
+    timeSliderContainer.classList.remove('force-hidden');
 });
 
 // Close Right Panel (Mobile/Action)
@@ -154,12 +164,6 @@ tabButtons.forEach(btn => {
     });
 });
 
-// Map Event: Mouse Move (Coordinate Tracking)
-map.on('mousemove', (e) => {
-    const lat = e.latlng.lat.toFixed(6);
-    const lng = e.latlng.lng.toFixed(6);
-    coordsDisplay.textContent = `Lat: ${lat} | Lng: ${lng}`;
-});
 
 // Map Event: Click for POI, ERB or Measurement
 map.on('click', (e) => {
@@ -194,6 +198,7 @@ erbForm.addEventListener('submit', (e) => {
         beamwidth: parseFloat(document.getElementById('beamwidth').value),
         color: document.getElementById('erb-color').value,
         name: document.getElementById('name').value || `ERB_${plottedElements.filter(el => el.type === 'ERB').length + 1}`,
+        datetime: document.getElementById('erb-datetime').value ? new Date(document.getElementById('erb-datetime').value).getTime() : null,
         id: currentEditId || Date.now(),
         isVisible: true
     };
@@ -214,6 +219,7 @@ erbForm.addEventListener('submit', (e) => {
     erbForm.reset();
     document.getElementById('beamwidth').value = 120;
     document.getElementById('erb-color').value = '#ffcb00';
+    updateTemporalSlider();
 });
 
 poiForm.addEventListener('submit', (e) => {
@@ -257,6 +263,7 @@ clearAllBtn.addEventListener('click', () => {
         });
         plottedElements = [];
         updateElementsList();
+        updateTemporalSlider();
 
         // Also clear measurement if any
         if (measureLayer) map.removeLayer(measureLayer);
@@ -275,8 +282,7 @@ measureBtn.addEventListener('click', () => {
     measureBtn.classList.toggle('active');
 
     if (isMeasuring) {
-        measureBtn.innerHTML = '<i class="fas fa-times"></i> Cancelar';
-        measureBtn.classList.replace('btn-action', 'btn-primary');
+        measureBtn.innerHTML = '<i class="fas fa-times"></i>';
         map.getContainer().style.cursor = 'crosshair';
         measurePoints = [];
         measureLayer.clearLayers();
@@ -287,8 +293,7 @@ measureBtn.addEventListener('click', () => {
 
 function stopMeasuring() {
     isMeasuring = false;
-    measureBtn.innerHTML = '<i class="fas fa-ruler"></i> Medir';
-    measureBtn.classList.replace('btn-primary', 'btn-action');
+    measureBtn.innerHTML = '<i class="fas fa-ruler"></i>';
     measureBtn.classList.remove('active');
     map.getContainer().style.cursor = '';
 
@@ -367,7 +372,8 @@ exportBtn.addEventListener('click', () => {
             Raio: el.radius || "",
             Abertura: el.beamwidth || "",
             Cor: el.color,
-            Icone: el.icon || ""
+            Icone: el.icon || "",
+            Data_Hora: el.datetime ? new Date(el.datetime).toISOString() : ""
         };
         return item;
     });
@@ -392,7 +398,7 @@ fileInput.addEventListener('change', (e) => {
     reader.onload = (event) => {
         try {
             const data = new Uint8Array(event.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -406,16 +412,22 @@ fileInput.addEventListener('change', (e) => {
             // For now, we just append them.
 
             jsonData.forEach(item => {
+                const dateValue = item.Data_Hora || item["Data/Hora"] || item.DataHora || "";
+
+                const type = item.Tipo;
+                const defaultColor = type === 'ERB' ? '#ffcb00' : '#ff4757';
+
                 const mappedData = {
-                    type: item.Tipo,
+                    type: type,
                     name: item.Nome,
                     lat: parseFloat(item.Latitude),
                     lng: parseFloat(item.Longitude),
                     azimuth: item.Azimute !== "" ? parseFloat(item.Azimute) : undefined,
                     radius: item.Raio !== "" ? parseFloat(item.Raio) : undefined,
                     beamwidth: item.Abertura !== "" ? parseFloat(item.Abertura) : undefined,
-                    color: item.Cor,
+                    color: item.Cor && item.Cor.startsWith('#') ? item.Cor : defaultColor,
                     icon: item.Icone || 'location-dot',
+                    datetime: dateValue ? parseDateRobust(dateValue) : null,
                     id: Date.now() + Math.random(), // Unique ID
                     isVisible: true
                 };
@@ -427,13 +439,27 @@ fileInput.addEventListener('change', (e) => {
                 }
             });
 
+            updateTemporalSlider();
+
+            // Default to "Show All" on import
+            showAllTimestamps = true;
+            if (globalVisibilityToggle) {
+                globalVisibilityToggle.classList.add('active');
+                const icon = globalVisibilityToggle.querySelector('i');
+                if (icon) icon.classList.replace('fa-eye', 'fa-eye-slash');
+            }
+
+            // Sync labels
+            allLabelsVisible = true;
+            map.getContainer().classList.remove('labels-hidden');
+
             // Reset input
             fileInput.value = "";
 
-            // Fly to the last element's location
+            // Fly to the FIRST element's location (or earliest erb)
             if (jsonData.length > 0) {
-                const last = jsonData[jsonData.length - 1];
-                map.flyTo([parseFloat(last.Latitude), parseFloat(last.Longitude)], 13);
+                const first = jsonData[0];
+                map.flyTo([parseFloat(first.Latitude), parseFloat(first.Longitude)], 13);
             }
 
         } catch (error) {
@@ -452,7 +478,7 @@ function plotERB(data, shouldFly = true) {
         fillColor: data.color,
         fillOpacity: 0.3,
         weight: 2
-    }).addTo(map);
+    });
 
     // 2. Antenna Marker (replacing circle marker)
     const marker = L.marker([data.lat, data.lng], {
@@ -463,7 +489,7 @@ function plotERB(data, shouldFly = true) {
             iconAnchor: [12, 12]
         }),
         draggable: true
-    }).addTo(map);
+    });
 
     // Draggable logic for ERB
     marker.on('dragend', function (e) {
@@ -485,22 +511,29 @@ function plotERB(data, shouldFly = true) {
     });
 
     // 3. Persistent Label
-    marker.bindTooltip(data.name, {
+    const dateStr = data.datetime ? new Date(data.datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    const labelContent = dateStr ? `${data.name}<br><small style="opacity: 0.8">${dateStr}</small>` : data.name;
+
+    marker.bindTooltip(labelContent, {
         permanent: true,
         direction: 'top',
         className: 'custom-label',
-        offset: [0, -10]
+        offset: [0, -10],
+        html: true
     });
 
-    marker.bindPopup(`<b>${data.name} (ERB)</b><br>Lat: ${data.lat}<br>Lng: ${data.lng}<br>Azimute: ${data.azimuth}°<br>Raio: ${data.radius}m`);
+    marker.bindPopup(`<b>${data.name} (ERB)</b><br>Lat: ${data.lat}<br>Lng: ${data.lng}<br>Azimute: ${data.azimuth}°<br>Raio: ${data.radius}m${data.datetime ? '<br>Data: ' + dateStr : ''}`);
 
     // 4. Store
-    plottedElements.push({
+    const el = {
         ...data,
         layers: [sectorLayer],
-        marker: marker
-    });
+        marker: marker,
+        isTimeVisible: true
+    };
+    plottedElements.push(el);
 
+    updateElementMapVisibility(el);
     updateElementsList();
     if (shouldFly) map.flyTo([data.lat, data.lng], 14);
 }
@@ -515,7 +548,7 @@ function plotPOI(data, shouldFly = true) {
             iconAnchor: [12, 24]
         }),
         draggable: true
-    }).addTo(map);
+    });
 
     // Draggable logic for POI
     marker.on('dragend', function (e) {
@@ -543,11 +576,14 @@ function plotPOI(data, shouldFly = true) {
     marker.bindPopup(`<b>${data.name} (Ponto)</b><br>Lat: ${data.lat}<br>Lng: ${data.lng}`);
 
     // 3. Store
-    plottedElements.push({
+    const el = {
         ...data,
-        marker: marker
-    });
+        marker: marker,
+        isTimeVisible: true
+    };
+    plottedElements.push(el);
 
+    updateElementMapVisibility(el);
     updateElementsList();
     if (shouldFly) map.flyTo([data.lat, data.lng], 15);
 }
@@ -612,13 +648,22 @@ function updateElementsList() {
         li.style.borderLeftColor = el.color;
 
         const typeIcon = el.type === 'ERB' ? 'fas fa-tower-broadcast' : `fas fa-${el.icon || 'location-dot'}`;
-        const subtitle = el.type === 'ERB' ? `${el.azimuth}° | ${el.radius}m` : `${el.lat.toFixed(4)}, ${el.lng.toFixed(4)}`;
-        const visibilityIcon = el.isVisible ? 'fa-eye' : 'fa-eye-slash';
+        let subtitle = el.type === 'ERB' ? `${el.azimuth}° | ${el.radius}m` : `${el.lat.toFixed(4)}, ${el.lng.toFixed(4)}`;
+
+        if (el.datetime) {
+            const date = new Date(el.datetime);
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            subtitle += ` | ${dateStr} ${timeStr}`;
+        }
+
+        const isActuallyVisible = el.isVisible && (el.isTimeVisible || showAllTimestamps);
+        const visibilityIcon = isActuallyVisible ? 'fa-eye' : 'fa-eye-slash';
 
         li.innerHTML = `
-            <div class="element-info" style="opacity: ${el.isVisible ? '1' : '0.5'}">
+            <div class="element-info" style="opacity: ${isActuallyVisible ? '1' : '0.5'}">
                 <h4><i class="${typeIcon}" style="color: ${el.color}; margin-right: 8px;"></i>${el.name}</h4>
-                <p>${subtitle}</p>
+                <p>${subtitle} ${!el.isTimeVisible ? '<span style="color: #ff4757; font-size: 10px;">(Oculto pelo tempo)</span>' : ''}</p>
             </div>
             <div class="item-actions">
                 <button class="item-btn visibility-btn" onclick="toggleVisibility(${el.id})" title="Ocultar/Mostrar"><i class="fas ${visibilityIcon}"></i></button>
@@ -637,9 +682,69 @@ function updateElementsList() {
     }
 }
 
+// Master Visibility Toggle
+const globalVisibilityToggle = document.getElementById('global-visibility-toggle');
+if (globalVisibilityToggle) {
+    globalVisibilityToggle.addEventListener('click', () => {
+        // Decide state based on showAllTimestamps (if we are showing everything, we want to go back to filtered)
+        const currentlyShowingEverything = showAllTimestamps;
+
+        if (currentlyShowingEverything) {
+            // Restore Filters / Filtered State
+            showAllTimestamps = false;
+            allLabelsVisible = false;
+            map.getContainer().classList.add('labels-hidden');
+            // We keep elements manual visibility as is, or we could reset it. 
+            // The prompt says "show/hide all", but also "similar role".
+            // Let's make it toggle between "Show All (No filters)" and "Apply Filters".
+        } else {
+            // "Exibir Tudo" - Master Show
+            showAllTimestamps = true;
+            allLabelsVisible = true;
+            map.getContainer().classList.remove('labels-hidden');
+            plottedElements.forEach(el => {
+                el.isVisible = true;
+                updateElementMapVisibility(el);
+            });
+        }
+
+        updateTemporalSlider();
+        updateElementsList();
+
+        // Update icon visually
+        const icon = globalVisibilityToggle.querySelector('i');
+        globalVisibilityToggle.classList.toggle('active', showAllTimestamps);
+        if (showAllTimestamps) {
+            icon.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            icon.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+    });
+}
+
+// Global Labels Toggle
+const globalLabelsToggle = document.getElementById('global-labels-toggle');
+if (globalLabelsToggle) {
+    globalLabelsToggle.addEventListener('click', () => {
+        allLabelsVisible = !allLabelsVisible;
+        const isHidden = !allLabelsVisible;
+        map.getContainer().classList.toggle('labels-hidden', isHidden);
+        globalLabelsToggle.classList.toggle('active', allLabelsVisible);
+    });
+    // Set active by default
+    globalLabelsToggle.classList.add('active');
+}
+
+
 function focusElement(id) {
     const el = plottedElements.find(e => e.id === id);
     if (el) {
+        if (!el.isVisible || !el.isTimeVisible) {
+            // Force visible if focused
+            el.isVisible = true;
+            el.isTimeVisible = true;
+            updateTemporalSlider();
+        }
         map.flyTo([el.lat, el.lng], 15);
         if (el.marker) el.marker.openPopup();
     }
@@ -703,25 +808,193 @@ function deleteElement(id) {
             erbForm.reset();
             poiForm.reset();
         }
+        updateTemporalSlider();
     }
 }
 
 function toggleVisibility(id) {
     const el = plottedElements.find(e => e.id === id);
     if (el) {
-        el.isVisible = !el.isVisible;
-
-        if (el.isVisible) {
-            if (el.layers) el.layers.forEach(l => map.addLayer(l));
-            if (el.marker) map.addLayer(el.marker);
+        if (!el.isTimeVisible && !showAllTimestamps && el.datetime !== null) {
+            // If hidden by time, jump to that time
+            currentSliderTimestamp = el.datetime;
+            el.isVisible = true; // Also ensure manual visibility
+            updateTemporalSlider();
         } else {
-            if (el.layers) el.layers.forEach(l => map.removeLayer(l));
-            if (el.marker) map.removeLayer(el.marker);
+            // Standard manual toggle
+            el.isVisible = !el.isVisible;
+            updateElementMapVisibility(el);
+            updateElementsList();
         }
-
-        updateElementsList();
     }
 }
 
 window.deleteElement = deleteElement;
 window.toggleVisibility = toggleVisibility;
+
+// --- Temporal Slider Logic ---
+
+let timedElements = [];
+let uniqueTimestamps = [];
+
+function updateTemporalSlider() {
+    timedElements = plottedElements.filter(el => el.datetime !== null).sort((a, b) => a.datetime - b.datetime);
+    uniqueTimestamps = [...new Set(timedElements.map(el => el.datetime))].sort((a, b) => a - b);
+
+    if (uniqueTimestamps.length < 2) {
+        timeSliderContainer.classList.add('hidden');
+        // Show everything if slider is hidden
+        plottedElements.forEach(el => {
+            el.isTimeVisible = true;
+            updateElementMapVisibility(el);
+        });
+        updateElementsList();
+        return;
+    }
+
+    timeSliderContainer.classList.remove('hidden');
+    timeSlider.max = uniqueTimestamps.length - 1;
+
+    // Default to first position if not set or out of bounds
+    if (currentSliderTimestamp === null || !uniqueTimestamps.includes(currentSliderTimestamp)) {
+        timeSlider.value = 0;
+        currentSliderTimestamp = uniqueTimestamps[0];
+    } else {
+        timeSlider.value = uniqueTimestamps.indexOf(currentSliderTimestamp);
+    }
+
+    updateSliderDisplay();
+    filterElementsByTime();
+}
+
+function updateSliderDisplay() {
+    if (currentSliderTimestamp) {
+        const date = new Date(currentSliderTimestamp);
+        currentTimeDisplay.textContent = date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+}
+
+function filterElementsByTime() {
+    plottedElements.forEach(el => {
+        if (el.type === 'POI') {
+            // POIs are always visible by default as requested
+            el.isTimeVisible = true;
+        } else if (el.datetime === null) {
+            // ERBs without date are also always visible
+            el.isTimeVisible = true;
+        } else if (showAllTimestamps) {
+            // Show all ERBs if toggle is active
+            el.isTimeVisible = true;
+        } else {
+            // Point-in-time: show only ERBs matching the exact selected timestamp
+            el.isTimeVisible = el.datetime === currentSliderTimestamp;
+        }
+        updateElementMapVisibility(el);
+    });
+    updateElementsList();
+
+    // Auto-center map on the currently visible ERB (point-in-time)
+    if (!showAllTimestamps) {
+        const visibleErb = plottedElements.find(el => el.type === 'ERB' && el.isTimeVisible && el.isVisible);
+        if (visibleErb) {
+            map.panTo([visibleErb.lat, visibleErb.lng]);
+        }
+    }
+}
+
+function updateElementMapVisibility(el) {
+    const shouldBeVisible = el.isVisible && (el.isTimeVisible || showAllTimestamps);
+
+    if (shouldBeVisible) {
+        if (el.layers) el.layers.forEach(l => { if (!map.hasLayer(l)) map.addLayer(l) });
+        if (el.marker) { if (!map.hasLayer(el.marker)) map.addLayer(el.marker) };
+    } else {
+        if (el.layers) el.layers.forEach(l => map.removeLayer(l));
+        if (el.marker) map.removeLayer(el.marker);
+    }
+}
+
+// Slider Event Listeners
+if (timeSlider) {
+    timeSlider.addEventListener('input', () => {
+        currentSliderTimestamp = uniqueTimestamps[parseInt(timeSlider.value)];
+        showAllTimestamps = false;
+
+        // Sync master toggle icon
+        if (globalVisibilityToggle) {
+            globalVisibilityToggle.classList.remove('active');
+            const icon = globalVisibilityToggle.querySelector('i');
+            if (icon) icon.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+
+        updateSliderDisplay();
+        filterElementsByTime();
+    });
+}
+
+if (sliderPrevBtn) {
+    sliderPrevBtn.addEventListener('click', () => {
+        let val = parseInt(timeSlider.value);
+        if (val > 0) {
+            timeSlider.value = val - 1;
+            timeSlider.dispatchEvent(new Event('input'));
+        }
+    });
+}
+
+if (sliderNextBtn) {
+    sliderNextBtn.addEventListener('click', () => {
+        let val = parseInt(timeSlider.value);
+        if (val < uniqueTimestamps.length - 1) {
+            timeSlider.value = val + 1;
+            timeSlider.dispatchEvent(new Event('input'));
+        }
+    });
+}
+
+
+// Keyboard Navigation for Slider
+window.addEventListener('keydown', (e) => {
+    if (!timeSlider || timeSliderContainer.classList.contains('hidden')) return;
+
+    // Ignore if user is typing in an input
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        let val = parseInt(timeSlider.value);
+        if (e.key === 'ArrowLeft' && val > 0) {
+            timeSlider.value = val - 1;
+            timeSlider.dispatchEvent(new Event('input'));
+        } else if (e.key === 'ArrowRight' && val < uniqueTimestamps.length - 1) {
+            timeSlider.value = val + 1;
+            timeSlider.dispatchEvent(new Event('input'));
+        }
+    }
+});
+
+function parseDateRobust(val) {
+    if (!val) return null;
+    if (val instanceof Date) return val.getTime();
+
+    // Try native parsing (handles ISO)
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.getTime();
+
+    // Try Brazilian/Common format: DD/MM/YYYY HH:mm:ss or similar
+    if (typeof val === 'string') {
+        const parts = val.match(/(\d{2})\/(\d{2})\/(\d{4})(?:[^\d]+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+        if (parts) {
+            const day = parseInt(parts[1], 10);
+            const month = parseInt(parts[2], 10) - 1;
+            const year = parseInt(parts[3], 10);
+            const hour = parts[4] ? parseInt(parts[4], 10) : 0;
+            const min = parts[5] ? parseInt(parts[5], 10) : 0;
+            const sec = parts[6] ? parseInt(parts[6], 10) : 0;
+
+            const nativeDate = new Date(year, month, day, hour, min, sec);
+            return isNaN(nativeDate.getTime()) ? null : nativeDate.getTime();
+        }
+    }
+
+    return null;
+}

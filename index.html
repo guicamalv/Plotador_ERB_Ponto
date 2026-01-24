@@ -87,6 +87,10 @@
                     <label for="name">Nome / ID ERB</label>
                     <input type="text" id="name" placeholder="ERB_01">
                 </div>
+                <div class="input-group">
+                    <label for="erb-datetime">Data e Hora (Opcional)</label>
+                    <input type="datetime-local" id="erb-datetime">
+                </div>
 
                 <button type="submit" class="btn-primary">Plotar ERB</button>
             </form>
@@ -146,29 +150,22 @@
         </div>
 
         <div class="action-buttons">
-            <div class="row">
+            <div class="row-single">
                 <button type="button" id="export-btn" class="btn-action" title="Baixar dados em Excel">
                     <i class="fas fa-file-excel"></i> Exportar
                 </button>
                 <button type="button" id="import-btn" class="btn-action" title="Carregar dados do Excel">
                     <i class="fas fa-file-import"></i> Importar
                 </button>
-            </div>
-            <div class="row">
                 <button type="button" id="measure-btn" class="btn-action" title="Medir distância">
-                    <i class="fas fa-ruler"></i> Medir
+                    <i class="fas fa-ruler"></i>
                 </button>
                 <button type="button" id="clear-all" class="btn-action btn-danger-outline"
                     title="Apagar todos os elementos">
-                    <i class="fas fa-trash-can"></i> Limpar Tudo
+                    <i class="fas fa-trash-can"></i>
                 </button>
             </div>
             <input type="file" id="file-input" accept=".xlsx, .xls" style="display: none;">
-        </div>
-
-        <!-- Coordinates Display -->
-        <div class="coords-display" id="coords-display">
-            Lat: 0.000000 | Lng: 0.000000
         </div>
 
         <button id="toggle-panel" class="btn-toggle-main">
@@ -179,20 +176,42 @@
     <div class="right-panel glass" id="right-sidebar">
         <div class="list-container">
             <div class="list-header">
-                <h3>Elementos Plotados</h3>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span id="element-count">0</span>
-                    <button id="close-right-panel" class="item-btn"
-                        style="background: none; border: 1px solid var(--glass-border); display: none;"><i
-                            class="fas fa-times"></i></button>
+                <div class="right-panel-header">
+                    <div class="header-main">
+                        <h3><i class="fas fa-list-ul"></i> Elementos Plotados (<span id="element-count">0</span>)</h3>
+                    </div>
+                    <div class="search-and-actions">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="elements-search" placeholder="Filtrar...">
+                        </div>
+                        <div class="header-actions">
+                            <button id="global-labels-toggle" title="Alternar Rótulos" class="action-item-btn">
+                                <i class="fas fa-tags"></i>
+                            </button>
+                            <button id="global-visibility-toggle" title="Exibir Tudo / Restaurar Filtros"
+                                class="action-item-btn">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="list-search">
-                <input type="text" id="elements-search" placeholder="Filtrar elementos...">
             </div>
             <ul id="elements-list">
                 <!-- Items will be added here -->
             </ul>
+        </div>
+    </div>
+
+    <!-- Temporal Slider -->
+    <div id="time-slider-container" class="glass hidden">
+        <div class="slider-controls">
+            <button id="slider-prev" title="Anterior"><i class="fas fa-chevron-left"></i></button>
+            <div class="slider-info">
+                <span id="current-time-display">01/01/2026 00:00</span>
+                <input type="range" id="time-slider" min="0" max="0" value="0">
+            </div>
+            <button id="slider-next" title="Próximo"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
 
