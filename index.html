@@ -172,7 +172,7 @@
         </div>
 
         <button id="toggle-panel" class="btn-toggle-main">
-            <i class="fas fa-eye-slash"></i> Ocultar Menus
+            <i class="fas fa-eye-slash"></i> Ocultar menus
         </button>
     </div>
 
@@ -180,7 +180,12 @@
         <div class="list-container">
             <div class="list-header">
                 <h3>Elementos Plotados</h3>
-                <span id="element-count">0</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span id="element-count">0</span>
+                    <button id="close-right-panel" class="item-btn"
+                        style="background: none; border: 1px solid var(--glass-border); display: none;"><i
+                            class="fas fa-times"></i></button>
+                </div>
             </div>
             <div class="list-search">
                 <input type="text" id="elements-search" placeholder="Filtrar elementos...">

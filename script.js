@@ -61,6 +61,7 @@ let currentEditId = null;
 const rightSidebar = document.getElementById('right-sidebar');
 const elementsSearchInput = document.getElementById('elements-search');
 const showAllBtn = document.getElementById('show-all');
+const closeRightPanelBtn = document.getElementById('close-right-panel');
 
 // Search DOM Elements
 const searchInput = document.getElementById('search-input');
@@ -97,6 +98,13 @@ showAllBtn.addEventListener('click', () => {
     rightSidebar.classList.remove('force-hidden');
     showAllBtn.classList.remove('visible');
 });
+
+// Close Right Panel (Mobile/Action)
+if (closeRightPanelBtn) {
+    closeRightPanelBtn.addEventListener('click', () => {
+        rightSidebar.classList.remove('visible');
+    });
+}
 
 // Search functionality
 if (searchBtn) {
@@ -186,7 +194,8 @@ erbForm.addEventListener('submit', (e) => {
         beamwidth: parseFloat(document.getElementById('beamwidth').value),
         color: document.getElementById('erb-color').value,
         name: document.getElementById('name').value || `ERB_${plottedElements.filter(el => el.type === 'ERB').length + 1}`,
-        id: currentEditId || Date.now()
+        id: currentEditId || Date.now(),
+        isVisible: true
     };
 
     if (currentEditId) {
@@ -216,7 +225,8 @@ poiForm.addEventListener('submit', (e) => {
         name: document.getElementById('poi-name').value,
         color: document.getElementById('poi-color').value,
         icon: selectedPoiIcon,
-        id: currentEditId || Date.now()
+        id: currentEditId || Date.now(),
+        isVisible: true
     };
 
     if (currentEditId) {
@@ -406,7 +416,8 @@ fileInput.addEventListener('change', (e) => {
                     beamwidth: item.Abertura !== "" ? parseFloat(item.Abertura) : undefined,
                     color: item.Cor,
                     icon: item.Icone || 'location-dot',
-                    id: Date.now() + Math.random() // Unique ID
+                    id: Date.now() + Math.random(), // Unique ID
+                    isVisible: true
                 };
 
                 if (mappedData.type === 'ERB') {
@@ -443,14 +454,35 @@ function plotERB(data, shouldFly = true) {
         weight: 2
     }).addTo(map);
 
-    // 2. Center Marker
-    const marker = L.circleMarker([data.lat, data.lng], {
-        radius: 6,
-        color: '#fff',
-        fillColor: data.color,
-        fillOpacity: 1,
-        weight: 2
+    // 2. Antenna Marker (replacing circle marker)
+    const marker = L.marker([data.lat, data.lng], {
+        icon: L.divIcon({
+            className: 'custom-erb-marker',
+            html: `<i class="fas fa-tower-broadcast" style="color: ${data.color}; font-size: 24px; text-shadow: 0 0 5px rgba(0,0,0,0.5);"></i>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        }),
+        draggable: true
     }).addTo(map);
+
+    // Draggable logic for ERB
+    marker.on('dragend', function (e) {
+        const newLatLng = e.target.getLatLng();
+        data.lat = newLatLng.lat;
+        data.lng = newLatLng.lng;
+
+        // Update form if this element is being edited
+        if (currentEditId === data.id) {
+            document.getElementById('lat').value = data.lat.toFixed(6);
+            document.getElementById('lng').value = data.lng.toFixed(6);
+        }
+
+        // Update layers
+        const newSectorPoints = getSectorPoints(data.lat, data.lng, data.azimuth, data.radius, data.beamwidth);
+        sectorLayer.setLatLngs(newSectorPoints);
+
+        updateElementsList();
+    });
 
     // 3. Persistent Label
     marker.bindTooltip(data.name, {
@@ -481,8 +513,24 @@ function plotPOI(data, shouldFly = true) {
             html: `<i class="fas fa-${data.icon || 'location-dot'}" style="color: ${data.color}; font-size: 24px; text-shadow: 0 0 5px rgba(0,0,0,0.5);"></i>`,
             iconSize: [24, 24],
             iconAnchor: [12, 24]
-        })
+        }),
+        draggable: true
     }).addTo(map);
+
+    // Draggable logic for POI
+    marker.on('dragend', function (e) {
+        const newLatLng = e.target.getLatLng();
+        data.lat = newLatLng.lat;
+        data.lng = newLatLng.lng;
+
+        // Update form if this element is being edited
+        if (currentEditId === data.id) {
+            document.getElementById('poi-lat').value = data.lat.toFixed(6);
+            document.getElementById('poi-lng').value = data.lng.toFixed(6);
+        }
+
+        updateElementsList();
+    });
 
     // 2. Persistent Label
     marker.bindTooltip(data.name, {
@@ -563,15 +611,17 @@ function updateElementsList() {
         li.className = 'element-item';
         li.style.borderLeftColor = el.color;
 
-        const typeIcon = el.type === 'ERB' ? 'fas fa-broadcast-tower' : 'fas fa-location-dot';
+        const typeIcon = el.type === 'ERB' ? 'fas fa-tower-broadcast' : `fas fa-${el.icon || 'location-dot'}`;
         const subtitle = el.type === 'ERB' ? `${el.azimuth}° | ${el.radius}m` : `${el.lat.toFixed(4)}, ${el.lng.toFixed(4)}`;
+        const visibilityIcon = el.isVisible ? 'fa-eye' : 'fa-eye-slash';
 
         li.innerHTML = `
-            <div class="element-info">
+            <div class="element-info" style="opacity: ${el.isVisible ? '1' : '0.5'}">
                 <h4><i class="${typeIcon}" style="color: ${el.color}; margin-right: 8px;"></i>${el.name}</h4>
                 <p>${subtitle}</p>
             </div>
             <div class="item-actions">
+                <button class="item-btn visibility-btn" onclick="toggleVisibility(${el.id})" title="Ocultar/Mostrar"><i class="fas ${visibilityIcon}"></i></button>
                 <button class="item-btn focus-btn" onclick="focusElement(${el.id})" title="Focar no mapa"><i class="fas fa-crosshairs"></i></button>
                 <button class="item-btn edit-btn" onclick="editElement(${el.id})" title="Editar"><i class="fas fa-edit"></i></button>
                 <button class="item-btn delete-btn" onclick="deleteElement(${el.id})" title="Excluir"><i class="fas fa-trash-can"></i></button>
@@ -579,6 +629,12 @@ function updateElementsList() {
         `;
         elementsList.appendChild(li);
     });
+
+    // Auto-hide one panel on small screens if both are open
+    if (window.innerWidth <= 768 && rightSidebar.classList.contains('visible') && !sidebar.classList.contains('hidden')) {
+        // Typically we want to see the elements list, so hide the left panel
+        // sidebar.classList.add('hidden');
+    }
 }
 
 function focusElement(id) {
@@ -609,8 +665,8 @@ function editElement(id) {
     } else {
         // Switch to POI tab
         document.querySelector('[data-tab="poi-tab"]').click();
-        document.getElementById('poi-lat').value = el.lat;
-        document.getElementById('poi-lng').value = el.lng;
+        document.getElementById('poi-lat').value = el.lat.toFixed(6);
+        document.getElementById('poi-lng').value = el.lng.toFixed(6);
         document.getElementById('poi-name').value = el.name;
         document.getElementById('poi-color').value = el.color;
 
@@ -650,4 +706,22 @@ function deleteElement(id) {
     }
 }
 
+function toggleVisibility(id) {
+    const el = plottedElements.find(e => e.id === id);
+    if (el) {
+        el.isVisible = !el.isVisible;
+
+        if (el.isVisible) {
+            if (el.layers) el.layers.forEach(l => map.addLayer(l));
+            if (el.marker) map.addLayer(el.marker);
+        } else {
+            if (el.layers) el.layers.forEach(l => map.removeLayer(l));
+            if (el.marker) map.removeLayer(el.marker);
+        }
+
+        updateElementsList();
+    }
+}
+
 window.deleteElement = deleteElement;
+window.toggleVisibility = toggleVisibility;
