@@ -72,6 +72,9 @@ const timeSlider = document.getElementById('time-slider');
 const currentTimeDisplay = document.getElementById('current-time-display');
 const sliderPrevBtn = document.getElementById('slider-prev');
 const sliderNextBtn = document.getElementById('slider-next');
+const helpBtn = document.getElementById('help-btn');
+const helpModal = document.getElementById('help-modal');
+const closeModalBtn = document.getElementById('close-modal');
 
 let showAllTimestamps = false;
 let allLabelsVisible = true;
@@ -108,6 +111,25 @@ showAllBtn.addEventListener('click', () => {
     showAllBtn.classList.remove('visible');
     timeSliderContainer.classList.remove('force-hidden');
 });
+
+// Help Modal Logic
+if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+        helpModal.classList.remove('hidden');
+    });
+}
+if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', () => {
+        helpModal.classList.add('hidden');
+    });
+}
+if (helpModal) {
+    helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+            helpModal.classList.add('hidden');
+        }
+    });
+}
 
 // Close Right Panel (Mobile/Action)
 if (closeRightPanelBtn) {
@@ -275,9 +297,11 @@ clearAllBtn.addEventListener('click', () => {
 let isMeasuring = false;
 let measurePoints = [];
 let measureLayer = L.layerGroup().addTo(map);
+let measurePolyline = null; // Single polyline instance
 let tempLine = null;
 
-measureBtn.addEventListener('click', () => {
+measureBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent map click when clicking the button
     isMeasuring = !isMeasuring;
     measureBtn.classList.toggle('active');
 
@@ -286,6 +310,10 @@ measureBtn.addEventListener('click', () => {
         map.getContainer().style.cursor = 'crosshair';
         measurePoints = [];
         measureLayer.clearLayers();
+        if (measurePolyline) {
+            map.removeLayer(measurePolyline);
+            measurePolyline = null;
+        }
     } else {
         stopMeasuring();
     }
@@ -306,16 +334,26 @@ function stopMeasuring() {
 function addMeasurePoint(latlng) {
     measurePoints.push(latlng);
 
-    // Add marker
+    // Add marker (non-interactive so it doesn't block future clicks)
     L.circleMarker(latlng, {
         radius: 4,
         color: '#ff4757',
-        fillOpacity: 1
+        fillOpacity: 1,
+        interactive: false
     }).addTo(measureLayer);
 
     if (measurePoints.length > 1) {
-        // Draw line
-        L.polyline(measurePoints, { color: '#ff4757', weight: 3, dashArray: '5, 10' }).addTo(measureLayer);
+        // Update or create polyline
+        if (!measurePolyline) {
+            measurePolyline = L.polyline(measurePoints, {
+                color: '#ff4757',
+                weight: 3,
+                dashArray: '5, 10',
+                interactive: false
+            }).addTo(measureLayer);
+        } else {
+            measurePolyline.setLatLngs(measurePoints);
+        }
 
         // Calculate distance
         let totalDist = 0;
@@ -325,14 +363,15 @@ function addMeasurePoint(latlng) {
 
         const distStr = totalDist > 1000 ? (totalDist / 1000).toFixed(2) + ' km' : Math.round(totalDist) + ' m';
 
-        // Show tooltip with distance at the last point
+        // Show tooltip with distance at the last point (non-interactive)
         L.marker(latlng, {
             icon: L.divIcon({
                 className: 'measure-label',
                 html: `<span>${distStr}</span>`,
                 iconSize: [100, 20],
                 iconAnchor: [50, -10]
-            })
+            }),
+            interactive: false
         }).addTo(measureLayer);
     }
 }
@@ -341,7 +380,13 @@ map.on('mousemove', (e) => {
     if (isMeasuring && measurePoints.length > 0) {
         if (tempLine) map.removeLayer(tempLine);
         const lastPoint = measurePoints[measurePoints.length - 1];
-        tempLine = L.polyline([lastPoint, e.latlng], { color: '#ff4757', weight: 2, dashArray: '5, 5', opacity: 0.5 }).addTo(map);
+        tempLine = L.polyline([lastPoint, e.latlng], {
+            color: '#ff4757',
+            weight: 2,
+            dashArray: '5, 5',
+            opacity: 0.5,
+            interactive: false
+        }).addTo(map);
     }
 });
 
@@ -356,34 +401,67 @@ window.addEventListener('keydown', (e) => {
 // --- Export / Import Logic ---
 
 exportBtn.addEventListener('click', () => {
-    if (plottedElements.length === 0) {
-        alert("Não há dados para exportar.");
-        return;
-    }
+    let dataToExport = [];
+    let fileName = `Plotador_ERB_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-    // Prepare data for Excel
-    const dataToExport = plottedElements.map(el => {
-        const item = {
-            Tipo: el.type,
-            Nome: el.name,
-            Latitude: el.lat,
-            Longitude: el.lng,
-            Azimute: el.azimuth || "",
-            Raio: el.radius || "",
-            Abertura: el.beamwidth || "",
-            Cor: el.color,
-            Icone: el.icon || "",
-            Data_Hora: el.datetime ? new Date(el.datetime).toISOString() : ""
-        };
-        return item;
-    });
+    if (plottedElements.length === 0) {
+        alert("Não há elementos plotados no mapa. Será feito o download de um modelo de planilha com cabeçalhos e dados de exemplo aceitos pela ferramenta.");
+        // Create template with headers and example data
+        dataToExport = [
+            {
+                Tipo: "ERB",
+                Nome: "Exemplo ERB",
+                Latitude: -15.7938,
+                Longitude: -47.8827,
+                Azimute: 120,
+                Raio: 500,
+                Abertura: 120,
+                Cor: "#ffcb00",
+                Icone: "",
+                Data: new Date().toLocaleDateString('pt-BR'),
+                Hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            },
+            {
+                Tipo: "POI",
+                Nome: "Exemplo Ponto",
+                Latitude: -15.7950,
+                Longitude: -47.8850,
+                Azimute: "",
+                Raio: "",
+                Abertura: "",
+                Cor: "#ff4757",
+                Icone: "location-dot",
+                Data: "",
+                Hora: ""
+            }
+        ];
+        fileName = `Modelo_Importacao_Plotador.xlsx`;
+    } else {
+        // Prepare data for Excel from existing elements
+        dataToExport = plottedElements.map(el => {
+            const dateObj = el.datetime ? new Date(el.datetime) : null;
+            return {
+                Tipo: el.type,
+                Nome: el.name,
+                Latitude: el.lat,
+                Longitude: el.lng,
+                Azimute: el.azimuth || "",
+                Raio: el.radius || "",
+                Abertura: el.beamwidth || "",
+                Cor: el.color,
+                Icone: el.icon || "",
+                Data: dateObj ? dateObj.toLocaleDateString('pt-BR') : "",
+                Hora: dateObj ? dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ""
+            };
+        });
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Plotados");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
 
     // Download file
-    XLSX.writeFile(workbook, `Plotador_ERB_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(workbook, fileName);
 });
 
 importBtn.addEventListener('click', () => {
@@ -412,7 +490,17 @@ fileInput.addEventListener('change', (e) => {
             // For now, we just append them.
 
             jsonData.forEach(item => {
-                const dateValue = item.Data_Hora || item["Data/Hora"] || item.DataHora || "";
+                let dateValue = item.Data_Hora || item["Data/Hora"] || item.DataHora || "";
+
+                // Support separate Data and Hora columns
+                if (!dateValue && (item.Data || item.Date)) {
+                    const d = item.Data || item.Date;
+                    const h = item.Hora || item.Time || "";
+                    // Handle Excel Date objects if they come as such
+                    const datePart = d instanceof Date ? d.toLocaleDateString('pt-BR') : d;
+                    const timePart = h instanceof Date ? h.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : h;
+                    dateValue = timePart ? `${datePart} ${timePart}` : datePart;
+                }
 
                 const type = item.Tipo;
                 const defaultColor = type === 'ERB' ? '#ffcb00' : '#ff4757';
@@ -491,6 +579,14 @@ function plotERB(data, shouldFly = true) {
         draggable: true
     });
 
+    // Support measurement on marker click
+    marker.on('click', (e) => {
+        if (isMeasuring) {
+            addMeasurePoint(e.latlng);
+            if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+        }
+    });
+
     // Draggable logic for ERB
     marker.on('dragend', function (e) {
         const newLatLng = e.target.getLatLng();
@@ -548,6 +644,14 @@ function plotPOI(data, shouldFly = true) {
             iconAnchor: [12, 24]
         }),
         draggable: true
+    });
+
+    // Support measurement on marker click
+    marker.on('click', (e) => {
+        if (isMeasuring) {
+            addMeasurePoint(e.latlng);
+            if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+        }
     });
 
     // Draggable logic for POI

@@ -210,8 +210,58 @@
             <div class="slider-info">
                 <span id="current-time-display">01/01/2026 00:00</span>
                 <input type="range" id="time-slider" min="0" max="0" value="0">
+                <span class="slider-hint"><i class="fas fa-keyboard"></i> Use as setas ← → do teclado</span>
             </div>
             <button id="slider-next" title="Próximo"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <!-- Help Button -->
+    <button id="help-btn" class="floating-btn help-btn-bottom" title="Ajuda e Instruções">
+        <i class="fas fa-question"></i>
+    </button>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay">
+        <div class="modal-content glass">
+            <header class="modal-header">
+                <h2><i class="fas fa-circle-info"></i> Instruções e Avisos</h2>
+                <button id="close-modal" class="close-btn"><i class="fas fa-times"></i></button>
+            </header>
+            <div class="modal-body">
+                <section>
+                    <h3><i class="fas fa-tower-broadcast"></i> Plotagem de ERBs</h3>
+                    <p>Defina latitude, longitude, azimute e ângulo de abertura para visualizar a cobertura estimada de
+                        uma Estação Rádio Base.</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-location-dot"></i> Pontos de Interesse (POI)</h3>
+                    <p>Adicione marcadores personalizados escolhendo ícones e cores para identificar locais relevantes
+                        no mapa.</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-ruler"></i> Medição de Distância</h3>
+                    <p>Ative a régua e clique em múltiplos pontos para medir distâncias. Use <strong>ESC</strong> para
+                        finalizar ou cancelar.</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-file-excel"></i> Importação e Exportação</h3>
+                    <p>Salve seus dados em arquivos Excel (.xlsx) ou importe planilhas existentes seguindo o formato
+                        padrão da ferramenta.</p>
+                </section>
+                <div class="modal-alerts">
+                    <div class="alert disclaimer">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        <p><strong>Aviso:</strong> A análise técnica e interpretação dos dados de ERB cabem inteiramente
+                            ao usuário. Esta ferramenta é um auxílio visual.</p>
+                    </div>
+                    <div class="alert privacy">
+                        <i class="fas fa-user-shield"></i>
+                        <p><strong>Privacidade:</strong> Este site não guarda nenhuma informação. Todos os dados
+                            processados permanecem localmente em seu navegador.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
