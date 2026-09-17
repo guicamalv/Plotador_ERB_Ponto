@@ -12,7 +12,15 @@ Uma ferramenta web para visualização e planejamento de Estações Rádio Base 
 - **Busca de Endereços:** Localize qualquer endereço utilizando o serviço Nominatim do OpenStreetMap.
 - **Importação/Exportação Excel:** Salve seu trabalho ou carregue listas de dados, com suporte a colunas de **Data e Hora separadas** ou unificadas. Linhas inválidas são ignoradas e contabilizadas.
 - **Modelo de Importação:** Ao exportar com o mapa vazio, a ferramenta gera automaticamente uma planilha modelo com dados de exemplo.
-- **Recuperação Automática:** Os elementos plotados ficam guardados no navegador (`localStorage`) e são restaurados ao reabrir a página.
+- **Arquivo de Projeto:** Salve o caso inteiro em um `.json` (elementos, vista do mapa, camada, filtros e rótulos) e reabra depois. Os elementos também ficam guardados no navegador (`localStorage`) e voltam ao reabrir a página.
+- **Link Compartilhável:** Um botão copia uma URL com o projeto comprimido no fragmento, para enviar a um colega sem servidor nem anexo. Ao abrir o link, o projeto é carregado e a URL é limpa.
+- **Desfazer:** Ctrl+Z ou o botão de desfazer revertem exclusões, edições, importações, aberturas de projeto e o "Apagar tudo" (até 20 passos).
+- **Coordenadas em Vários Formatos:** Os campos "Colar coordenadas" e as planilhas aceitam decimal (ponto ou vírgula), graus/minutos/segundos e UTM. Popups e o clique com o botão direito mostram os três formatos, copiam as coordenadas, buscam o endereço (Nominatim) e abrem o Google Maps ou o Street View.
+- **Lista Ligada ao Mapa:** Passar o mouse na lista destaca o setor ou marcador no mapa, e vice-versa.
+- **Raio ao Redor de um Ponto:** Na aba Análise, desenhe um círculo de N metros em torno de um ponto e liste as ERBs dentro dele com distância, rumo e se o setor cobre o ponto.
+- **Controles do Mapa:** Barra de escala, tela cheia e localização atual.
+- **Muitos Elementos:** Setores desenhados em canvas e agrupamento automático de pontos quando há mais de 50 POIs.
+- **Modo Aplicativo (PWA):** Quando servido por HTTP, pode ser instalado no celular ou no computador e abre offline. Só os arquivos da ferramenta são cacheados; mapas de fundo não, por respeito às políticas do OpenStreetMap e do Google.
 - **Múltiplas Camadas de Mapa:** Google Roadmap (padrão), Satélite e Híbrido, com OpenStreetMap e CARTO claro/escuro como alternativas. Se os tiles do Google não carregarem, o mapa troca automaticamente para o OpenStreetMap.
 - **Slider Temporal:** Filtre ERBs por data/hora em três modos. **Instante** mostra só as ERBs do horário selecionado; **Intervalo** mostra todas as ERBs entre um início e um fim; **Todos** desliga o filtro de tempo. As setas ← → movem o instante ou a janela inteira, e Shift + setas ajustam o fim.
 - **Análise de Sobreposição:** Três ferramentas na aba Análise, aplicadas às ERBs e pontos visíveis no mapa:
@@ -31,6 +39,7 @@ Uma ferramenta web para visualização e planejamento de Estações Rádio Base 
 - **[SheetJS](https://sheetjs.com/) 0.18.5:** Processamento de arquivos Excel no navegador.
 - **[Font Awesome](https://fontawesome.com/) 6.4.0:** Conjunto de ícones para a interface e marcadores.
 - **[polygon-clipping](https://github.com/mfogel/polygon-clipping) 0.15.7:** Interseção de polígonos para a análise de sobreposição.
+- **[Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) 1.5.3:** Agrupamento de pontos próximos.
 - **[Google Fonts](https://fonts.google.com/):** Tipografias Outfit e Inter, com fontes do sistema como alternativa offline.
 
 ## 📂 Como Usar
@@ -43,6 +52,9 @@ Uma ferramenta web para visualização e planejamento de Estações Rádio Base 
 6. **Medir Distância:** Clique no botão de régua e vá clicando no mapa para definir o trajeto. Pressione `ESC` para cancelar ou terminar.
 7. **Exportar Dados:** Clique no botão "Exportar" para baixar um arquivo Excel com todos os elementos presentes no mapa.
 8. **Importar Dados:** Clique em "Importar" e selecione um arquivo Excel. A ferramenta aceita tanto colunas unificadas de data/hora quanto separadas.
+9. **Salvar e Abrir Projeto:** "Salvar" baixa um `.json` com o caso completo; "Abrir" o carrega de volta, substituindo o mapa atual (Ctrl+Z desfaz).
+10. **Compartilhar:** O botão de link copia uma URL com o projeto embutido. Links acima de 30 KB podem ser cortados por aplicativos de mensagem; nesse caso prefira o arquivo de projeto.
+11. **Instalar como Aplicativo:** Sirva a pasta por HTTP (`npm run serve` ou GitHub Pages) e use "Instalar" no navegador. Abrindo o `index.html` direto do disco, o modo aplicativo não é registrado.
 
 ### Como a sobreposição é calculada
 
@@ -60,8 +72,9 @@ Os setores desenhados são uma simplificação com raio uniforme, sem relevo, in
 |-----------|------------------------|---------------------|---------------------------------------------------------|
 | Tipo      | `ERB`                  | `POI`               | Obrigatória                                             |
 | Nome      | texto                  | texto               | Gerado automaticamente se vazio                         |
-| Latitude  | número                 | número              | Obrigatória, entre -90 e 90                             |
-| Longitude | número                 | número              | Obrigatória, entre -180 e 180                           |
+| Latitude  | número ou GMS          | número ou GMS       | Obrigatória, entre -90 e 90; aceita `-15,79` e `15°47'38"S` |
+| Longitude | número ou GMS          | número ou GMS       | Obrigatória, entre -180 e 180                           |
+| Coordenadas | `lat, lng` ou UTM    | `lat, lng` ou UTM   | Opcional; usada quando Latitude/Longitude estão vazias. Ex.: `23L 191141 8251747` |
 | Azimute   | graus (0 a 360)        | vazio               | Obrigatória para ERB; `0` significa norte               |
 | Raio      | metros                 | vazio               | Obrigatória para ERB                                    |
 | Abertura  | graus                  | vazio               | Obrigatória para ERB                                    |
@@ -78,7 +91,7 @@ npm test        # executa os testes unitários (Node.js 18+)
 npm run serve   # serve a pasta em http://localhost:8080
 ```
 
-As funções puras (geometria do setor, sobreposição, parse de datas, sanitização) ficam em `utils.js` e são testadas em `test/utils.test.js` e `test/geometry.test.js`. A integração contínua roda esses testes em cada push e pull request.
+As funções puras (geometria do setor, sobreposição, coordenadas e UTM, parse de datas, sanitização) ficam em `utils.js` e são testadas em `test/utils.test.js`, `test/geometry.test.js` e `test/coordinates.test.js`. A integração contínua roda esses testes em cada push e pull request.
 
 ## 🔐 Privacidade e Responsabilidade
 
@@ -91,7 +104,9 @@ As funções puras (geometria do setor, sobreposição, parse de datas, sanitiza
 
 - `index.html`: Estrutura principal da página e importação de scripts.
 - `script.js`: Lógica de manipulação do mapa, formulários, slider temporal, análise de sobreposição, persistência e integração Excel.
-- `utils.js`: Funções puras compartilhadas entre o navegador e os testes.
+- `utils.js`: Funções puras compartilhadas entre o navegador e os testes (geometria, coordenadas, datas, sanitização).
+- `manifest.json` e `sw.js`: Modo aplicativo e cache offline dos arquivos da ferramenta.
+- `icons/`: Ícones do aplicativo.
 - `style.css`: Estilização completa, layouts responsivos e design system.
 - `vendor/`: Bibliotecas de terceiros versionadas localmente.
 - `test/`: Testes unitários executados com o runner nativo do Node.js.

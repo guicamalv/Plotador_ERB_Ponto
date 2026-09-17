@@ -476,6 +476,27 @@ input:focus {
     box-shadow: 0 0 10px var(--primary-glow);
 }
 
+/* Campo de colar coordenadas */
+.coords-input.is-valid {
+    border-color: #34d399;
+    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.15);
+}
+
+.coords-input.is-invalid {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 0 2px rgba(255, 71, 87, 0.15);
+}
+
+.row-project {
+    grid-template-columns: 1fr 1fr auto auto;
+}
+
+.btn-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Análise de sobreposição */
 .analysis-source {
     font-size: 12px;
@@ -573,6 +594,80 @@ input:focus {
 .coverage-overlay {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+}
+
+/* =========================================================================
+   Popups e menu de contexto do mapa
+   ========================================================================= */
+.leaflet-popup-content-wrapper {
+    background: #0f172a;
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.leaflet-popup-tip {
+    background: #0f172a;
+}
+
+.leaflet-popup-content {
+    margin: 12px 14px;
+    font-size: 12px;
+    line-height: 1.5;
+    min-width: 210px;
+}
+
+.leaflet-popup-close-button {
+    color: var(--text-secondary) !important;
+}
+
+.popup-coords {
+    color: var(--text-secondary);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    margin: 4px 0;
+}
+
+.popup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.popup-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    text-decoration: none;
+}
+
+.leaflet-container a.popup-btn {
+    color: var(--text-primary);
+}
+
+.popup-btn:hover,
+.leaflet-container a.popup-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.popup-btn i {
+    font-size: 11px;
+}
+
+.popup-address {
+    margin-top: 6px;
+    color: #cbd5e1;
+    font-size: 11px;
 }
 
 /* =========================================================================
@@ -764,6 +859,12 @@ input:focus {
     opacity: 0.5;
 }
 
+.element-item.is-hovered {
+    background: rgba(255, 203, 0, 0.12);
+    border-color: var(--primary-color);
+    transform: translateX(-2px);
+}
+
 .element-info {
     flex: 1;
     min-width: 0;
@@ -901,8 +1002,93 @@ input:focus {
 }
 
 .custom-erb-marker:hover i,
-.custom-poi-marker:hover i {
-    transform: scale(1.2);
+.custom-poi-marker:hover i,
+.custom-erb-marker.is-hovered i,
+.custom-poi-marker.is-hovered i {
+    transform: scale(1.35);
+    filter: drop-shadow(0 0 6px #fff);
+}
+
+/* Agrupamento de pontos (markercluster) em tema escuro */
+.marker-cluster {
+    background: rgba(255, 203, 0, 0.35);
+}
+
+.marker-cluster div {
+    background: rgba(255, 203, 0, 0.85);
+    color: var(--bg-dark);
+    font-weight: 700;
+    font-family: var(--font-ui);
+}
+
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+    background: rgba(255, 203, 0, 0.35);
+}
+
+.marker-cluster-small div,
+.marker-cluster-medium div,
+.marker-cluster-large div {
+    background: rgba(255, 203, 0, 0.85);
+}
+
+/* Controles do Leaflet: escala e ferramentas do mapa */
+.leaflet-control-scale {
+    margin-left: 80px !important;
+    margin-bottom: 30px !important;
+}
+
+.leaflet-control-scale-line {
+    background: rgba(10, 10, 10, 0.75);
+    color: var(--text-primary);
+    border-color: var(--primary-color);
+    font-size: 10px;
+}
+
+.map-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.map-tools button {
+    width: 34px;
+    height: 34px;
+    background: var(--panel-bg-strong);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.map-tools button:hover {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+}
+
+.map-tools button.active {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+}
+
+.locate-marker {
+    background: none !important;
+    border: none !important;
+}
+
+.locate-marker span {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #4285f4;
+    border: 3px solid #fff;
+    box-shadow: 0 0 8px rgba(66, 133, 244, 0.8);
 }
 
 .measure-label {
@@ -1357,6 +1543,10 @@ input:focus {
         right: 12px;
         width: 40px;
         height: 40px;
+    }
+
+    .leaflet-control-scale {
+        margin-left: 12px !important;
     }
 
     .modal-content {

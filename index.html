@@ -7,9 +7,16 @@
     <meta name="description" content="Ferramenta web para plotar setores de ERBs e pontos de interesse em mapas interativos, com slider temporal e importação/exportação em Excel.">
     <meta name="theme-color" content="#0a0a0a">
     <title>Plotador de ERBs e Pontos</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <!-- Bibliotecas versionadas localmente (funcionam offline) -->
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
+    <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.Default.css">
     <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 
     <!-- Google Fonts (opcional: a interface usa fontes do sistema quando offline) -->
@@ -50,8 +57,13 @@
 
         <!-- Aba ERB -->
         <div id="erb-tab" class="tab-content active" role="tabpanel">
-            <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
+            <p class="tab-hint">Clique no mapa, cole as coordenadas ou preencha os campos:</p>
             <form id="erb-form">
+                <div class="input-group">
+                    <label for="erb-coords">Colar coordenadas (decimal, GMS ou UTM)</label>
+                    <input type="text" id="erb-coords" class="coords-input" autocomplete="off"
+                        placeholder='-15.79, -47.88 · 15°47\'38"S 47°52\'58"W · 23L 191141 8251747'>
+                </div>
                 <div class="input-row">
                     <div class="input-group">
                         <label for="lat">Latitude</label>
@@ -97,8 +109,13 @@
 
         <!-- Aba POI -->
         <div id="poi-tab" class="tab-content" role="tabpanel">
-            <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
+            <p class="tab-hint">Clique no mapa, cole as coordenadas ou preencha os campos:</p>
             <form id="poi-form">
+                <div class="input-group">
+                    <label for="poi-coords">Colar coordenadas (decimal, GMS ou UTM)</label>
+                    <input type="text" id="poi-coords" class="coords-input" autocomplete="off"
+                        placeholder='-15.79, -47.88 · 15°47\'38"S 47°52\'58"W · 23L 191141 8251747'>
+                </div>
                 <div class="input-row">
                     <div class="input-group">
                         <label for="poi-lat">Latitude</label>
@@ -173,6 +190,19 @@
                 </div>
             </div>
 
+            <div class="input-group">
+                <span class="input-label">4. Raio ao redor de um ponto</span>
+                <div class="input-row input-row-select">
+                    <select id="radius-poi" aria-label="Ponto de referência">
+                        <option value="">Nenhum ponto visível</option>
+                    </select>
+                    <input type="number" id="radius-meters" min="10" step="10" value="2000" aria-label="Raio em metros" title="Raio em metros">
+                </div>
+                <button type="button" id="radius-btn" class="btn-action btn-block" title="Desenha o círculo e lista as ERBs a até essa distância do ponto">
+                    <i class="fas fa-circle-dot"></i> Listar ERBs no raio
+                </button>
+            </div>
+
             <div id="analysis-results" class="analysis-results hidden" aria-live="polite"></div>
 
             <button type="button" id="clear-analysis-btn" class="btn-action btn-danger-outline btn-block">
@@ -196,7 +226,22 @@
                     <i class="fas fa-trash-can"></i>
                 </button>
             </div>
+            <div class="row-single row-project">
+                <button type="button" id="save-project-btn" class="btn-action" title="Salvar o projeto completo em um arquivo .json">
+                    <i class="fas fa-floppy-disk"></i> Salvar
+                </button>
+                <button type="button" id="open-project-btn" class="btn-action" title="Abrir um arquivo de projeto .json">
+                    <i class="fas fa-folder-open"></i> Abrir
+                </button>
+                <button type="button" id="share-link-btn" class="btn-action" title="Copiar um link com o projeto embutido" aria-label="Copiar link compartilhável">
+                    <i class="fas fa-link"></i>
+                </button>
+                <button type="button" id="undo-btn" class="btn-action" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>
+                    <i class="fas fa-rotate-left"></i>
+                </button>
+            </div>
             <input type="file" id="file-input" accept=".xlsx, .xls" class="visually-hidden" aria-hidden="true" tabindex="-1">
+            <input type="file" id="project-input" accept=".json,application/json" class="visually-hidden" aria-hidden="true" tabindex="-1">
         </div>
 
         <button id="toggle-panel" class="btn-toggle-main">
@@ -308,9 +353,20 @@
                         quantos setores cobrem cada célula da grade.</p>
                 </section>
                 <section>
-                    <h3><i class="fas fa-floppy-disk"></i> Recuperação Automática</h3>
-                    <p>Os elementos plotados ficam guardados neste navegador e são restaurados ao reabrir a página.
-                        Use <strong>Apagar tudo</strong> para descartá-los.</p>
+                    <h3><i class="fas fa-floppy-disk"></i> Projeto, Link e Recuperação</h3>
+                    <p><strong>Salvar</strong> grava o caso inteiro em um arquivo .json, com elementos, vista do mapa,
+                        camada e filtros, e <strong>Abrir</strong> o carrega de volta. O botão de <strong>link</strong>
+                        copia uma URL com o projeto embutido, para enviar a um colega sem anexar arquivo. Os elementos
+                        também ficam guardados neste navegador e voltam ao reabrir a página. <strong>Ctrl+Z</strong>
+                        ou o botão de desfazer reverte exclusões, edições, importações e o "Apagar tudo".</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-location-crosshairs"></i> Coordenadas e Mapa</h3>
+                    <p>Os campos "Colar coordenadas" aceitam decimal, graus/minutos/segundos e UTM. O clique com o
+                        <strong>botão direito</strong> no mapa mostra as coordenadas do local nos três formatos, busca o
+                        endereço e abre o Google Maps ou o Street View. Os popups dos elementos têm as mesmas ações.
+                        Passar o mouse na lista destaca o elemento no mapa, e vice-versa. Os botões no canto inferior
+                        direito ativam tela cheia e localização atual.</p>
                 </section>
                 <div class="modal-alerts">
                     <div class="alert disclaimer">
@@ -330,6 +386,7 @@
     </div>
 
     <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/markercluster/leaflet.markercluster.js"></script>
     <script src="vendor/sheetjs/xlsx.full.min.js"></script>
     <script src="vendor/polygon-clipping/polygon-clipping.umd.min.js"></script>
     <script src="utils.js"></script>
