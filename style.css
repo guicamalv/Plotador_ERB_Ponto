@@ -132,8 +132,8 @@ html {
     top: 20px;
     left: 20px;
     width: 380px;
-    max-height: calc(100vh - 40px);
-    max-height: calc(100dvh - 40px);
+    max-height: calc(100vh - 90px);
+    max-height: calc(100dvh - 90px);
     border-radius: var(--radius-lg);
     padding: 24px;
     z-index: 1000;
@@ -285,6 +285,35 @@ input {
     font-size: 14px;
     outline: none;
     transition: all 0.2s ease;
+}
+
+select {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+}
+
+select:focus {
+    border-color: var(--primary-color);
+}
+
+select option {
+    background: #0f172a;
+    color: var(--text-primary);
+}
+
+.input-row-select {
+    grid-template-columns: 1fr auto;
+}
+
+.btn-block {
+    width: 100%;
 }
 
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
@@ -445,6 +474,105 @@ input:focus {
     color: white;
     border-color: var(--primary-color);
     box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Análise de sobreposição */
+.analysis-source {
+    font-size: 12px;
+    color: var(--primary-color);
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.analysis-results {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.analysis-results.hidden {
+    display: none;
+}
+
+.analysis-results h4 {
+    font-size: 13px;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+}
+
+.analysis-results p {
+    margin-bottom: 4px;
+    color: #d5d5d5;
+}
+
+.analysis-results .muted {
+    color: var(--text-secondary);
+}
+
+.analysis-results table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+.analysis-results th,
+.analysis-results td {
+    text-align: left;
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    vertical-align: top;
+}
+
+.analysis-results th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+}
+
+.analysis-results td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.analysis-results .tag-all {
+    color: #34d399;
+    font-weight: 700;
+}
+
+.analysis-results .tag-none {
+    color: var(--text-secondary);
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.coverage-overlay {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
 /* =========================================================================
@@ -721,8 +849,18 @@ input:focus {
 }
 
 /* =========================================================================
-   Leaflet: marcadores, rótulos e medição
+   Leaflet: controles, marcadores, rótulos e medição
    ========================================================================= */
+.leaflet-bottom.leaflet-right .leaflet-control {
+    margin-bottom: 30px;
+}
+
+.leaflet-control-attribution {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    margin: 0 !important;
+}
 .leaflet-container {
     background: #0b0e14 !important;
 }
@@ -852,11 +990,137 @@ input:focus {
     gap: 8px;
 }
 
+.slider-top {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 #current-time-display {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--primary-color);
     font-family: 'Courier New', Courier, monospace;
+    white-space: nowrap;
+}
+
+.slider-mode {
+    display: flex;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 2px;
+}
+
+.mode-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn.active {
+    background: var(--primary-color);
+    color: var(--bg-dark);
+}
+
+/* Trilha com um ou dois cursores sobrepostos */
+.slider-track {
+    position: relative;
+    width: 100%;
+    height: 24px;
+}
+
+.slider-track::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 4px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.slider-track-fill {
+    position: absolute;
+    top: 50%;
+    height: 4px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background: var(--primary-color);
+    left: 0;
+    width: 0;
+    pointer-events: none;
+}
+
+.slider-track input[type="range"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+    outline: none;
+    box-shadow: none;
+}
+
+.slider-track input[type="range"].hidden {
+    display: none;
+}
+
+.slider-track input[type="range"]::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 24px;
+}
+
+.slider-track input[type="range"]::-moz-range-track {
+    background: transparent;
+    height: 24px;
+}
+
+.slider-track input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: auto;
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 6px var(--primary-glow);
+    cursor: grab;
+}
+
+.slider-track input[type="range"]::-moz-range-thumb {
+    pointer-events: auto;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 6px var(--primary-glow);
+    cursor: grab;
+}
+
+.slider-track input[type="range"]:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid #fff;
 }
 
 .slider-hint {
@@ -869,16 +1133,7 @@ input:focus {
     gap: 5px;
 }
 
-#time-slider {
-    width: 100%;
-    accent-color: var(--primary-color);
-    cursor: pointer;
-    padding: 0;
-    border: none;
-    background: none;
-}
-
-.slider-controls button {
+.slider-controls > button {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid var(--glass-border);
     color: white;
@@ -893,7 +1148,7 @@ input:focus {
     transition: all 0.2s;
 }
 
-.slider-controls button:hover {
+.slider-controls > button:hover {
     background: var(--secondary-color);
     border-color: var(--primary-color);
 }
@@ -1023,8 +1278,8 @@ input:focus {
         left: 12px;
         right: 12px;
         width: auto;
-        max-height: 60vh;
-        max-height: 60dvh;
+        max-height: 50vh;
+        max-height: 50dvh;
         padding: 16px;
         border-radius: 16px;
     }
@@ -1051,8 +1306,8 @@ input:focus {
         left: 12px;
         right: 12px;
         width: auto;
-        max-height: 40vh;
-        max-height: 40dvh;
+        max-height: 36vh;
+        max-height: 36dvh;
         border-radius: 16px;
         transform: translateY(120%);
     }
@@ -1072,13 +1327,15 @@ input:focus {
 
     /* Quando o slider temporal está visível, a lista sobe para não cobri-lo */
     body:has(#time-slider-container:not(.hidden):not(.force-hidden)) .right-panel {
-        bottom: 118px;
+        bottom: 150px;
+        max-height: 30vh;
+        max-height: 30dvh;
     }
 
-    .toast {
-        top: auto;
-        bottom: 12px;
-        transform: translate(-50%, 20px);
+    #current-time-display {
+        white-space: normal;
+        text-align: center;
+        font-size: 12px;
     }
 
     #time-slider-container {
