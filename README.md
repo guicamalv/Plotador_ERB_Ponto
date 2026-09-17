@@ -14,13 +14,13 @@ Uma ferramenta web para visualização e planejamento de Estações Rádio Base 
 - **Modelo de Importação:** Ao exportar com o mapa vazio, a ferramenta gera automaticamente uma planilha modelo com dados de exemplo.
 - **Recuperação Automática:** Os elementos plotados ficam guardados no navegador (`localStorage`) e são restaurados ao reabrir a página.
 - **Múltiplas Camadas de Mapa:** Google Roadmap (padrão), Satélite e Híbrido, com OpenStreetMap e CARTO claro/escuro como alternativas. Se os tiles do Google não carregarem, o mapa troca automaticamente para o OpenStreetMap.
-- **Slider Temporal:** Filtre ERBs por data/hora em dois modos. **Instante** mostra só as ERBs do horário selecionado; **Intervalo** mostra todas as ERBs entre um início e um fim. As setas ← → movem o instante ou a janela inteira, e Shift + setas ajustam o fim.
+- **Slider Temporal:** Filtre ERBs por data/hora em três modos. **Instante** mostra só as ERBs do horário selecionado; **Intervalo** mostra todas as ERBs entre um início e um fim; **Todos** desliga o filtro de tempo. As setas ← → movem o instante ou a janela inteira, e Shift + setas ajustam o fim.
 - **Análise de Sobreposição:** Três ferramentas na aba Análise, aplicadas às ERBs e pontos visíveis no mapa:
   - **Pontos dentro dos setores:** teste analítico ponto a ponto, listando quais setores contêm cada ponto.
   - **Interseção exata:** polígono comum a todos os setores, com área, centróide e os pontos que caem dentro.
   - **Mapa de cobertura:** grade que conta quantos setores cobrem cada célula, desenhada como camada de calor com legenda de áreas.
 - **Interface Responsiva:** Layout adaptado a celulares e tablets, com tema escuro e efeitos de vidro.
-- **Gerenciamento de Elementos:** Lista lateral para focar, editar, ocultar ou remover elementos individualmente. Marcadores podem ser arrastados no mapa.
+- **Gerenciamento de Elementos:** Lista lateral para focar, editar, ocultar ou remover elementos individualmente, com botões para ocultar todos os elementos de uma vez ou apenas os rótulos. Marcadores podem ser arrastados no mapa.
 - **Funciona Offline:** Todas as bibliotecas ficam versionadas na pasta `vendor/`. Apenas os mapas de fundo, a busca de endereços e as fontes do Google exigem internet.
 
 ## 🛠️ Tecnologias Utilizadas
