@@ -13,7 +13,7 @@ Uma ferramenta web para visualização e planejamento de Estações Rádio Base 
 - **Importação/Exportação Excel:** Salve seu trabalho ou carregue listas de dados, com suporte a colunas de **Data e Hora separadas** ou unificadas. Linhas inválidas são ignoradas e contabilizadas.
 - **Modelo de Importação:** Ao exportar com o mapa vazio, a ferramenta gera automaticamente uma planilha modelo com dados de exemplo.
 - **Recuperação Automática:** Os elementos plotados ficam guardados no navegador (`localStorage`) e são restaurados ao reabrir a página.
-- **Múltiplas Camadas de Mapa:** OpenStreetMap (padrão), CARTO claro e escuro, além das camadas do Google como opção secundária.
+- **Múltiplas Camadas de Mapa:** Google Roadmap (padrão), Satélite e Híbrido, com OpenStreetMap e CARTO claro/escuro como alternativas. Se os tiles do Google não carregarem, o mapa troca automaticamente para o OpenStreetMap.
 - **Slider Temporal:** Filtre ERBs por data/hora e navegue com as setas ← → do teclado.
 - **Interface Responsiva:** Layout adaptado a celulares e tablets, com tema escuro e efeitos de vidro.
 - **Gerenciamento de Elementos:** Lista lateral para focar, editar, ocultar ou remover elementos individualmente. Marcadores podem ser arrastados no mapa.
@@ -67,7 +67,7 @@ As funções puras (geometria do setor, parse de datas, sanitização) ficam em 
 ## 🔐 Privacidade e Responsabilidade
 
 - **Dados Locais:** Este site não armazena nenhuma informação em servidores. Todos os dados permanecem no seu navegador. A busca de endereços consulta o Nominatim (OpenStreetMap) e os mapas de fundo são carregados dos respectivos provedores.
-- **Camadas do Google:** As camadas "Google (não oficial)" usam um endpoint sem chave de API e podem parar de funcionar sem aviso. Prefira OpenStreetMap ou CARTO para uso contínuo.
+- **Camadas do Google:** As camadas do Google usam um endpoint sem chave de API e podem parar de funcionar sem aviso. Quando isso acontece, a ferramenta cai automaticamente para o OpenStreetMap e exibe um aviso. As demais camadas continuam disponíveis no seletor do mapa.
 - **Análise Técnica:** A interpretação dos dados de cobertura de ERB e a precisão da análise cabem inteiramente ao usuário técnico.
 - **Instruções:** Um guia rápido é exibido automaticamente ao carregar o site, acessível a qualquer momento pelo botão `(?)`.
 

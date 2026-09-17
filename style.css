@@ -780,6 +780,35 @@ input:focus {
 }
 
 /* =========================================================================
+   Notificação discreta (toast)
+   ========================================================================= */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translate(-50%, -20px);
+    max-width: min(90vw, 480px);
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    background: var(--panel-bg-strong);
+    border: 1px solid var(--glass-border-strong);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    z-index: 1003;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+
+.toast.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* =========================================================================
    Slider temporal
    ========================================================================= */
 #time-slider-container {
@@ -1044,6 +1073,12 @@ input:focus {
     /* Quando o slider temporal está visível, a lista sobe para não cobri-lo */
     body:has(#time-slider-container:not(.hidden):not(.force-hidden)) .right-panel {
         bottom: 118px;
+    }
+
+    .toast {
+        top: auto;
+        bottom: 12px;
+        transform: translate(-50%, 20px);
     }
 
     #time-slider-container {

@@ -45,27 +45,59 @@
         maxZoom: 20
     });
 
-    // As camadas do Google abaixo usam um endpoint não documentado, sem chave de API.
-    // Elas podem parar de funcionar sem aviso e ficam apenas como opção secundária.
+    // As camadas do Google usam um endpoint sem chave de API e podem falhar sem aviso.
+    // Por isso, se os tiles do Google não carregarem, o mapa cai automaticamente
+    // para o OpenStreetMap (ver watchGoogleTiles abaixo).
     const googleOptions = { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '&copy; Google Maps' };
     const googleRoadmap = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', googleOptions);
     const googleSatellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', googleOptions);
     const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', googleOptions);
 
+    const FALLBACK_LAYER = osmStandard;
+
     const map = L.map('map', {
         center: [-15.793889, -47.882778],
         zoom: 13,
-        layers: [osmStandard]
+        layers: [googleRoadmap]
     });
 
     L.control.layers({
+        'Google Roadmap': googleRoadmap,
+        'Google Satélite': googleSatellite,
+        'Google Híbrido': googleHybrid,
         'OpenStreetMap': osmStandard,
         'CARTO Claro': cartoLight,
-        'CARTO Escuro': cartoDark,
-        'Google Roadmap (não oficial)': googleRoadmap,
-        'Google Satélite (não oficial)': googleSatellite,
-        'Google Híbrido (não oficial)': googleHybrid
+        'CARTO Escuro': cartoDark
     }).addTo(map);
+
+    /**
+     * Fallback automático: se uma camada do Google acumular erros de tile sem
+     * nenhum tile carregado com sucesso, troca para o OpenStreetMap e avisa.
+     */
+    function watchGoogleTiles(layer) {
+        const TILE_ERROR_THRESHOLD = 4;
+        let errors = 0;
+        let loaded = 0;
+        let switched = false;
+
+        layer.on('tileload', () => { loaded++; });
+        layer.on('tileerror', () => {
+            errors++;
+            if (switched || loaded > 0 || errors < TILE_ERROR_THRESHOLD || !map.hasLayer(layer)) return;
+            switched = true;
+            map.removeLayer(layer);
+            map.addLayer(FALLBACK_LAYER);
+            showToast('Os mapas do Google não estão disponíveis. Usando OpenStreetMap como alternativa.');
+        });
+        layer.on('remove', () => {
+            // Reinicia a contagem para uma nova tentativa quando o usuário reativar a camada
+            errors = 0;
+            loaded = 0;
+            switched = false;
+        });
+    }
+
+    [googleRoadmap, googleSatellite, googleHybrid].forEach(watchGoogleTiles);
 
     // =========================================================================
     // Estado
@@ -1016,6 +1048,27 @@
             stepSlider(e.key === 'ArrowLeft' ? -1 : 1);
         }
     });
+
+    // =========================================================================
+    // Notificações discretas
+    // =========================================================================
+
+    let toastTimer = null;
+
+    function showToast(message, duration = 6000) {
+        let toast = $('toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.className = 'toast';
+            toast.setAttribute('role', 'status');
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.classList.add('visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('visible'), duration);
+    }
 
     // =========================================================================
     // Persistência local (localStorage)
