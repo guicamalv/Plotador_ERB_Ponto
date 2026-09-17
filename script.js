@@ -810,6 +810,7 @@
         }).join('');
 
         elementsList.innerHTML = html;
+        syncVisibilityToggle();
         updateAnalysisSource();
         schedulePersist();
     }
@@ -918,12 +919,21 @@
     // Botões globais: exibir tudo e rótulos
     // =========================================================================
 
+    /** Liga ou desliga o modo "Todos" do slider (ignora o filtro de tempo). */
     function setShowAll(value) {
         showAllTimestamps = value;
-        globalVisibilityToggle.classList.toggle('active', value);
+        syncSliderModeButtons();
+    }
+
+    /** Mantém o ícone do botão "olho" coerente com o estado dos elementos. */
+    function syncVisibilityToggle() {
+        const anyShown = plottedElements.some(el => el.isVisible);
         const icon = globalVisibilityToggle.querySelector('i');
-        icon.classList.toggle('fa-eye', !value);
-        icon.classList.toggle('fa-eye-slash', value);
+        icon.classList.toggle('fa-eye', anyShown);
+        icon.classList.toggle('fa-eye-slash', !anyShown);
+        globalVisibilityToggle.classList.toggle('active', !anyShown && plottedElements.length > 0);
+        globalVisibilityToggle.title = anyShown ? 'Ocultar todos os elementos' : 'Mostrar todos os elementos';
+        globalVisibilityToggle.setAttribute('aria-label', globalVisibilityToggle.title);
     }
 
     function setLabelsVisible(value) {
@@ -932,19 +942,14 @@
         globalLabelsToggle.classList.toggle('active', value);
     }
 
+    // Olho: oculta todos os elementos de uma vez, ou mostra todos se estiverem ocultos
     globalVisibilityToggle.addEventListener('click', () => {
-        if (showAllTimestamps) {
-            setShowAll(false);
-            setLabelsVisible(false);
-        } else {
-            setShowAll(true);
-            setLabelsVisible(true);
-            plottedElements.forEach(el => {
-                el.isVisible = true;
-                updateElementMapVisibility(el);
-            });
-        }
-        updateTemporalSlider();
+        if (plottedElements.length === 0) return;
+        const showEverything = !plottedElements.some(el => el.isVisible);
+        plottedElements.forEach(el => {
+            el.isVisible = showEverything;
+            updateElementMapVisibility(el);
+        });
         updateElementsList();
     });
 
@@ -1006,7 +1011,11 @@
         const startIndex = parseInt(timeSlider.value, 10);
         const endIndex = parseInt(timeSliderEnd.value, 10);
 
-        if (sliderMode === 'range') {
+        if (showAllTimestamps) {
+            const total = uniqueTimestamps.length;
+            currentTimeDisplay.textContent = `Todos os instantes · ${total} instante${total > 1 ? 's' : ''} (filtro de tempo desligado)`;
+            sliderTrackFill.style.width = '0';
+        } else if (sliderMode === 'range') {
             const count = endIndex - startIndex + 1;
             currentTimeDisplay.textContent =
                 `${formatFullDateTime(currentSliderTimestamp)} → ${formatFullDateTime(rangeEndTimestamp)} · ${count} instante${count > 1 ? 's' : ''}`;
@@ -1094,10 +1103,23 @@
         applySliderIndexes(start, end);
     }
 
-    function setSliderMode(mode) {
-        sliderMode = mode === 'range' ? 'range' : 'instant';
-        sliderModeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === sliderMode));
+    function syncSliderModeButtons() {
+        const active = showAllTimestamps ? 'all' : sliderMode;
+        sliderModeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === active));
         timeSliderEnd.classList.toggle('hidden', sliderMode !== 'range');
+    }
+
+    function setSliderMode(mode) {
+        if (mode === 'all') {
+            setShowAll(true);
+            updateSliderDisplay();
+            filterElementsByTime();
+            return;
+        }
+
+        sliderMode = mode === 'range' ? 'range' : 'instant';
+        showAllTimestamps = false;
+        syncSliderModeButtons();
         if (uniqueTimestamps.length < 2) return;
 
         let start = parseInt(timeSlider.value, 10);

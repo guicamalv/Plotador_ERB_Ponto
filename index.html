@@ -216,11 +216,11 @@
                         <input type="text" id="elements-search" placeholder="Filtrar..." autocomplete="off" aria-label="Filtrar elementos">
                     </div>
                     <div class="header-actions">
-                        <button id="global-labels-toggle" title="Alternar Rótulos" aria-label="Alternar rótulos" class="action-item-btn">
+                        <button id="global-labels-toggle" title="Mostrar/ocultar rótulos" aria-label="Mostrar ou ocultar rótulos" class="action-item-btn">
                             <i class="fas fa-tags"></i>
                         </button>
-                        <button id="global-visibility-toggle" title="Exibir Tudo / Restaurar Filtros"
-                            aria-label="Exibir tudo ou restaurar filtros" class="action-item-btn">
+                        <button id="global-visibility-toggle" title="Ocultar todos os elementos"
+                            aria-label="Ocultar todos os elementos" class="action-item-btn">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
@@ -241,6 +241,7 @@
                     <div class="slider-mode" role="group" aria-label="Modo do filtro temporal">
                         <button type="button" class="mode-btn active" data-mode="instant" title="Mostra as ERBs de um único instante">Instante</button>
                         <button type="button" class="mode-btn" data-mode="range" title="Mostra as ERBs entre dois instantes">Intervalo</button>
+                        <button type="button" class="mode-btn" data-mode="all" title="Ignora o filtro de tempo e mostra todas as ERBs">Todos</button>
                     </div>
                     <span id="current-time-display">01/01/2026 00:00</span>
                 </div>
@@ -279,6 +280,12 @@
                         no mapa.</p>
                 </section>
                 <section>
+                    <h3><i class="fas fa-list-ul"></i> Lista de Elementos</h3>
+                    <p>Na lista lateral, o botão de <strong>etiqueta</strong> mostra ou oculta os rótulos com os nomes,
+                        e o botão de <strong>olho</strong> oculta ou mostra todos os elementos de uma vez. Cada item
+                        também tem seus próprios botões de ocultar, focar, editar e excluir.</p>
+                </section>
+                <section>
                     <h3><i class="fas fa-ruler"></i> Medição de Distância</h3>
                     <p>Ative a régua e clique em múltiplos pontos para medir distâncias. Use <strong>ESC</strong> para
                         finalizar ou cancelar.</p>
@@ -291,7 +298,8 @@
                 <section>
                     <h3><i class="fas fa-clock"></i> Slider Temporal</h3>
                     <p>No modo <strong>Instante</strong>, apenas as ERBs do horário selecionado aparecem. No modo
-                        <strong>Intervalo</strong>, aparecem todas as ERBs entre o início e o fim escolhidos.</p>
+                        <strong>Intervalo</strong>, aparecem todas as ERBs entre o início e o fim escolhidos. O modo
+                        <strong>Todos</strong> desliga o filtro de tempo.</p>
                 </section>
                 <section>
                     <h3><i class="fas fa-draw-polygon"></i> Análise de Sobreposição</h3>
