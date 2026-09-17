@@ -1,0 +1,16 @@
+# Dependências e caches
+node_modules/
+.npm/
+package-lock.json
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Arquivos gerados durante testes locais
+*.log
+Plotador_ERB_Export_*.xlsx
+Modelo_Importacao_Plotador.xlsx

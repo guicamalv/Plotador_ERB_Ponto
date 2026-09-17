@@ -1,0 +1,19 @@
+{
+  "name": "plotador-erb-ponto",
+  "version": "1.1.0",
+  "description": "Ferramenta web para plotar setores de ERBs e pontos de interesse em mapas interativos.",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guicamalv/Plotador_ERB_Ponto.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check utils.js && node --check script.js",
+    "serve": "python3 -m http.server 8080"
+  }
+}
