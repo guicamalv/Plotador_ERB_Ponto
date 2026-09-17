@@ -4,79 +4,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Ferramenta web para plotar setores de ERBs e pontos de interesse em mapas interativos, com slider temporal e importação/exportação em Excel.">
+    <meta name="theme-color" content="#0a0a0a">
     <title>Plotador de ERBs e Pontos</title>
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Bibliotecas versionadas localmente (funcionam offline) -->
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts (opcional: a interface usa fontes do sistema quando offline) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;600&display=swap"
         rel="stylesheet">
 
-    <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="dark-theme">
+<body>
     <div id="map"></div>
 
-    <!-- Show Panel Button (Hidden by default) -->
-    <button id="show-all" class="floating-btn hidden-all" title="Mostrar Controles">
+    <!-- Botão para reexibir os painéis (oculto por padrão) -->
+    <button id="show-all" class="floating-btn hidden-all" title="Mostrar Controles" aria-label="Mostrar controles">
         <i class="fas fa-eye"></i>
     </button>
 
     <div class="control-panel glass" id="sidebar">
         <header>
             <h1>Plotador de ERBs e Pontos</h1>
-
         </header>
 
-        <!-- Search Bar -->
+        <!-- Busca de endereço -->
         <div class="search-container">
-            <input type="text" id="search-input" placeholder="Buscar endereço...">
-            <button id="search-btn" title="Buscar"><i class="fas fa-search"></i></button>
+            <input type="text" id="search-input" placeholder="Buscar endereço..." autocomplete="off" aria-label="Buscar endereço">
+            <button id="search-btn" title="Buscar" aria-label="Buscar"><i class="fas fa-search"></i></button>
         </div>
 
-        <!-- Tabs Navigation -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="erb-tab">ERBs</button>
-            <button class="tab-btn" data-tab="poi-tab">Pontos (POI)</button>
+        <!-- Abas -->
+        <div class="tabs" role="tablist">
+            <button class="tab-btn active" data-tab="erb-tab" role="tab">ERBs</button>
+            <button class="tab-btn" data-tab="poi-tab" role="tab">Pontos (POI)</button>
         </div>
 
-        <!-- ERB Tab Content -->
-        <div id="erb-tab" class="tab-content active">
+        <!-- Aba ERB -->
+        <div id="erb-tab" class="tab-content active" role="tabpanel">
             <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
             <form id="erb-form">
                 <div class="input-row">
                     <div class="input-group">
                         <label for="lat">Latitude</label>
-                        <input type="number" id="lat" step="any" placeholder="-23.5505" required>
+                        <input type="number" id="lat" step="any" min="-90" max="90" placeholder="-23.5505" required>
                     </div>
                     <div class="input-group">
                         <label for="lng">Longitude</label>
-                        <input type="number" id="lng" step="any" placeholder="-46.6333" required>
+                        <input type="number" id="lng" step="any" min="-180" max="180" placeholder="-46.6333" required>
                     </div>
                 </div>
                 <div class="input-row">
                     <div class="input-group">
                         <label for="azimuth">Azimute (°)</label>
-                        <input type="number" id="azimuth" min="0" max="360" placeholder="90" required>
+                        <input type="number" id="azimuth" step="any" min="0" max="360" placeholder="90" required>
                     </div>
                     <div class="input-group">
                         <label for="radius">Raio (m)</label>
-                        <input type="number" id="radius" min="1" value="1000" required>
+                        <input type="number" id="radius" step="any" min="1" value="1000" required>
                     </div>
                 </div>
                 <div class="input-row">
                     <div class="input-group">
                         <label for="beamwidth">Abertura (°)</label>
-                        <input type="number" id="beamwidth" min="1" max="360" value="120" required>
+                        <input type="number" id="beamwidth" step="any" min="1" max="360" value="120" required>
                     </div>
                     <div class="input-group">
                         <label for="erb-color">Cor</label>
@@ -85,7 +83,7 @@
                 </div>
                 <div class="input-group">
                     <label for="name">Nome / ID ERB</label>
-                    <input type="text" id="name" placeholder="ERB_01">
+                    <input type="text" id="name" placeholder="ERB_01" maxlength="120">
                 </div>
                 <div class="input-group">
                     <label for="erb-datetime">Data e Hora (Opcional)</label>
@@ -96,24 +94,24 @@
             </form>
         </div>
 
-        <!-- POI Tab Content -->
-        <div id="poi-tab" class="tab-content">
+        <!-- Aba POI -->
+        <div id="poi-tab" class="tab-content" role="tabpanel">
             <p class="tab-hint">Clique no mapa ou preencha as coordenadas:</p>
             <form id="poi-form">
                 <div class="input-row">
                     <div class="input-group">
                         <label for="poi-lat">Latitude</label>
-                        <input type="number" id="poi-lat" step="any" placeholder="Clique no mapa..." required>
+                        <input type="number" id="poi-lat" step="any" min="-90" max="90" placeholder="Clique no mapa..." required>
                     </div>
                     <div class="input-group">
                         <label for="poi-lng">Longitude</label>
-                        <input type="number" id="poi-lng" step="any" placeholder="Clique no mapa..." required>
+                        <input type="number" id="poi-lng" step="any" min="-180" max="180" placeholder="Clique no mapa..." required>
                     </div>
                 </div>
                 <div class="input-row">
                     <div class="input-group">
                         <label for="poi-name">Nome do Ponto</label>
-                        <input type="text" id="poi-name" placeholder="Ponto_A" required>
+                        <input type="text" id="poi-name" placeholder="Ponto_A" maxlength="120" required>
                     </div>
                     <div class="input-group">
                         <label for="poi-color">Cor</label>
@@ -121,28 +119,18 @@
                     </div>
                 </div>
                 <div class="input-group">
-                    <label>Ícone do Ponto</label>
+                    <span class="input-label">Ícone do Ponto</span>
                     <div class="icon-selector" id="poi-icon-selector">
-                        <button type="button" class="icon-btn active" data-icon="location-dot" title="Localização"><i
-                                class="fas fa-location-dot"></i></button>
-                        <button type="button" class="icon-btn" data-icon="house" title="Residência/Local"><i
-                                class="fas fa-house"></i></button>
-                        <button type="button" class="icon-btn" data-icon="user" title="Pessoa (Suspeito/Vítima)"><i
-                                class="fas fa-user"></i></button>
-                        <button type="button" class="icon-btn" data-icon="car" title="Veículo"><i
-                                class="fas fa-car"></i></button>
-                        <button type="button" class="icon-btn" data-icon="person-falling" title="Corpo"><i
-                                class="fas fa-person-falling"></i></button>
-                        <button type="button" class="icon-btn" data-icon="gun" title="Arma de Fogo"><i
-                                class="fas fa-gun"></i></button>
-                        <button type="button" class="icon-btn" data-icon="hand-fist" title="Agressão/Violência"><i
-                                class="fas fa-hand-fist"></i></button>
-                        <button type="button" class="icon-btn" data-icon="handcuffs" title="Algemas"><i
-                                class="fas fa-handcuffs"></i></button>
-                        <button type="button" class="icon-btn" data-icon="pills" title="Drogas/Entorpecentes"><i
-                                class="fas fa-pills"></i></button>
-                        <button type="button" class="icon-btn" data-icon="camera" title="Câmera/Foto"><i
-                                class="fas fa-camera"></i></button>
+                        <button type="button" class="icon-btn active" data-icon="location-dot" title="Localização" aria-label="Localização"><i class="fas fa-location-dot"></i></button>
+                        <button type="button" class="icon-btn" data-icon="house" title="Residência/Local" aria-label="Residência ou local"><i class="fas fa-house"></i></button>
+                        <button type="button" class="icon-btn" data-icon="user" title="Pessoa (Suspeito/Vítima)" aria-label="Pessoa"><i class="fas fa-user"></i></button>
+                        <button type="button" class="icon-btn" data-icon="car" title="Veículo" aria-label="Veículo"><i class="fas fa-car"></i></button>
+                        <button type="button" class="icon-btn" data-icon="person-falling" title="Corpo" aria-label="Corpo"><i class="fas fa-person-falling"></i></button>
+                        <button type="button" class="icon-btn" data-icon="gun" title="Arma de Fogo" aria-label="Arma de fogo"><i class="fas fa-gun"></i></button>
+                        <button type="button" class="icon-btn" data-icon="hand-fist" title="Agressão/Violência" aria-label="Agressão ou violência"><i class="fas fa-hand-fist"></i></button>
+                        <button type="button" class="icon-btn" data-icon="handcuffs" title="Algemas" aria-label="Algemas"><i class="fas fa-handcuffs"></i></button>
+                        <button type="button" class="icon-btn" data-icon="pills" title="Drogas/Entorpecentes" aria-label="Drogas ou entorpecentes"><i class="fas fa-pills"></i></button>
+                        <button type="button" class="icon-btn" data-icon="camera" title="Câmera/Foto" aria-label="Câmera ou foto"><i class="fas fa-camera"></i></button>
                     </div>
                 </div>
                 <button type="submit" class="btn-primary">Adicionar Ponto</button>
@@ -157,15 +145,15 @@
                 <button type="button" id="import-btn" class="btn-action" title="Carregar dados do Excel">
                     <i class="fas fa-file-import"></i> Importar
                 </button>
-                <button type="button" id="measure-btn" class="btn-action" title="Medir distância">
+                <button type="button" id="measure-btn" class="btn-action" title="Medir distância" aria-label="Medir distância">
                     <i class="fas fa-ruler"></i>
                 </button>
                 <button type="button" id="clear-all" class="btn-action btn-danger-outline"
-                    title="Apagar todos os elementos">
+                    title="Apagar todos os elementos" aria-label="Apagar todos os elementos">
                     <i class="fas fa-trash-can"></i>
                 </button>
             </div>
-            <input type="file" id="file-input" accept=".xlsx, .xls" style="display: none;">
+            <input type="file" id="file-input" accept=".xlsx, .xls" class="visually-hidden" aria-hidden="true" tabindex="-1">
         </div>
 
         <button id="toggle-panel" class="btn-toggle-main">
@@ -175,58 +163,56 @@
 
     <div class="right-panel glass" id="right-sidebar">
         <div class="list-container">
-            <div class="list-header">
-                <div class="right-panel-header">
-                    <div class="header-main">
-                        <h3><i class="fas fa-list-ul"></i> Elementos Plotados (<span id="element-count">0</span>)</h3>
+            <div class="right-panel-header">
+                <div class="header-main">
+                    <h3><i class="fas fa-list-ul"></i> Elementos Plotados (<span id="element-count">0</span>)</h3>
+                </div>
+                <div class="search-and-actions">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="elements-search" placeholder="Filtrar..." autocomplete="off" aria-label="Filtrar elementos">
                     </div>
-                    <div class="search-and-actions">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="elements-search" placeholder="Filtrar...">
-                        </div>
-                        <div class="header-actions">
-                            <button id="global-labels-toggle" title="Alternar Rótulos" class="action-item-btn">
-                                <i class="fas fa-tags"></i>
-                            </button>
-                            <button id="global-visibility-toggle" title="Exibir Tudo / Restaurar Filtros"
-                                class="action-item-btn">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
+                    <div class="header-actions">
+                        <button id="global-labels-toggle" title="Alternar Rótulos" aria-label="Alternar rótulos" class="action-item-btn">
+                            <i class="fas fa-tags"></i>
+                        </button>
+                        <button id="global-visibility-toggle" title="Exibir Tudo / Restaurar Filtros"
+                            aria-label="Exibir tudo ou restaurar filtros" class="action-item-btn">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </div>
                 </div>
             </div>
             <ul id="elements-list">
-                <!-- Items will be added here -->
+                <!-- Itens inseridos pelo script -->
             </ul>
         </div>
     </div>
 
-    <!-- Temporal Slider -->
+    <!-- Slider temporal -->
     <div id="time-slider-container" class="glass hidden">
         <div class="slider-controls">
-            <button id="slider-prev" title="Anterior"><i class="fas fa-chevron-left"></i></button>
+            <button id="slider-prev" title="Anterior" aria-label="Instante anterior"><i class="fas fa-chevron-left"></i></button>
             <div class="slider-info">
                 <span id="current-time-display">01/01/2026 00:00</span>
-                <input type="range" id="time-slider" min="0" max="0" value="0">
+                <input type="range" id="time-slider" min="0" max="0" value="0" aria-label="Instante selecionado">
                 <span class="slider-hint"><i class="fas fa-keyboard"></i> Use as setas ← → do teclado</span>
             </div>
-            <button id="slider-next" title="Próximo"><i class="fas fa-chevron-right"></i></button>
+            <button id="slider-next" title="Próximo" aria-label="Próximo instante"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
 
-    <!-- Help Button -->
-    <button id="help-btn" class="floating-btn help-btn-bottom" title="Ajuda e Instruções">
+    <!-- Botão de ajuda -->
+    <button id="help-btn" class="floating-btn help-btn-bottom" title="Ajuda e Instruções" aria-label="Ajuda e instruções">
         <i class="fas fa-question"></i>
     </button>
 
-    <!-- Help Modal -->
-    <div id="help-modal" class="modal-overlay">
-        <div class="modal-content glass">
+    <!-- Modal de ajuda -->
+    <div id="help-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <div class="modal-content">
             <header class="modal-header">
-                <h2><i class="fas fa-circle-info"></i> Instruções e Avisos</h2>
-                <button id="close-modal" class="close-btn"><i class="fas fa-times"></i></button>
+                <h2 id="help-title"><i class="fas fa-circle-info"></i> Instruções e Avisos</h2>
+                <button id="close-modal" class="close-btn" aria-label="Fechar"><i class="fas fa-times"></i></button>
             </header>
             <div class="modal-body">
                 <section>
@@ -247,7 +233,12 @@
                 <section>
                     <h3><i class="fas fa-file-excel"></i> Importação e Exportação</h3>
                     <p>Salve seus dados em arquivos Excel (.xlsx) ou importe planilhas existentes seguindo o formato
-                        padrão da ferramenta.</p>
+                        padrão da ferramenta. Com o mapa vazio, o botão Exportar gera um modelo de planilha.</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-floppy-disk"></i> Recuperação Automática</h3>
+                    <p>Os elementos plotados ficam guardados neste navegador e são restaurados ao reabrir a página.
+                        Use <strong>Apagar tudo</strong> para descartá-los.</p>
                 </section>
                 <div class="modal-alerts">
                     <div class="alert disclaimer">
@@ -257,19 +248,18 @@
                     </div>
                     <div class="alert privacy">
                         <i class="fas fa-user-shield"></i>
-                        <p><strong>Privacidade:</strong> Este site não guarda nenhuma informação. Todos os dados
-                            processados permanecem localmente em seu navegador.</p>
+                        <p><strong>Privacidade:</strong> Este site não envia dados a servidores. Tudo permanece
+                            localmente em seu navegador. Apenas a busca de endereços consulta o serviço Nominatim do
+                            OpenStreetMap e os mapas de fundo são carregados de seus provedores.</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <!-- SheetJS for Excel Support -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/sheetjs/xlsx.full.min.js"></script>
+    <script src="utils.js"></script>
     <script src="script.js"></script>
 </body>
 
