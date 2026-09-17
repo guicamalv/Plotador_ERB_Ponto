@@ -287,9 +287,11 @@ clearAllBtn.addEventListener('click', () => {
         updateElementsList();
         updateTemporalSlider();
 
-        // Also clear measurement if any
-        if (measureLayer) map.removeLayer(measureLayer);
+        // Also clear measurement if any (keep the layer group on the map for future measurements)
+        measureLayer.clearLayers();
+        measurePolyline = null;
         measurePoints = [];
+        if (isMeasuring) stopMeasuring();
     }
 });
 
@@ -445,9 +447,9 @@ exportBtn.addEventListener('click', () => {
                 Nome: el.name,
                 Latitude: el.lat,
                 Longitude: el.lng,
-                Azimute: el.azimuth || "",
-                Raio: el.radius || "",
-                Abertura: el.beamwidth || "",
+                Azimute: numberOrEmpty(el.azimuth),
+                Raio: numberOrEmpty(el.radius),
+                Abertura: numberOrEmpty(el.beamwidth),
                 Cor: el.color,
                 Icone: el.icon || "",
                 Data: dateObj ? dateObj.toLocaleDateString('pt-BR') : "",
@@ -510,9 +512,9 @@ fileInput.addEventListener('change', (e) => {
                     name: item.Nome,
                     lat: parseFloat(item.Latitude),
                     lng: parseFloat(item.Longitude),
-                    azimuth: item.Azimute !== "" ? parseFloat(item.Azimute) : undefined,
-                    radius: item.Raio !== "" ? parseFloat(item.Raio) : undefined,
-                    beamwidth: item.Abertura !== "" ? parseFloat(item.Abertura) : undefined,
+                    azimuth: parseNumberOrUndefined(item.Azimute),
+                    radius: parseNumberOrUndefined(item.Raio),
+                    beamwidth: parseNumberOrUndefined(item.Abertura),
                     color: item.Cor && item.Cor.startsWith('#') ? item.Cor : defaultColor,
                     icon: item.Icone || 'location-dot',
                     datetime: dateValue ? parseDateRobust(dateValue) : null,
@@ -587,28 +589,37 @@ function plotERB(data, shouldFly = true) {
         }
     });
 
+    // 3. Store (created before the handlers so drag updates the stored element, not a stale copy)
+    const el = {
+        ...data,
+        layers: [sectorLayer],
+        marker: marker,
+        isTimeVisible: true
+    };
+
     // Draggable logic for ERB
     marker.on('dragend', function (e) {
         const newLatLng = e.target.getLatLng();
-        data.lat = newLatLng.lat;
-        data.lng = newLatLng.lng;
+        el.lat = newLatLng.lat;
+        el.lng = newLatLng.lng;
 
         // Update form if this element is being edited
-        if (currentEditId === data.id) {
-            document.getElementById('lat').value = data.lat.toFixed(6);
-            document.getElementById('lng').value = data.lng.toFixed(6);
+        if (currentEditId === el.id) {
+            document.getElementById('lat').value = el.lat.toFixed(6);
+            document.getElementById('lng').value = el.lng.toFixed(6);
         }
 
         // Update layers
-        const newSectorPoints = getSectorPoints(data.lat, data.lng, data.azimuth, data.radius, data.beamwidth);
+        const newSectorPoints = getSectorPoints(el.lat, el.lng, el.azimuth, el.radius, el.beamwidth);
         sectorLayer.setLatLngs(newSectorPoints);
+        marker.setPopupContent(buildErbPopup(el));
 
         updateElementsList();
     });
 
-    // 3. Persistent Label
-    const dateStr = data.datetime ? new Date(data.datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-    const labelContent = dateStr ? `${data.name}<br><small style="opacity: 0.8">${dateStr}</small>` : data.name;
+    // 4. Persistent Label
+    const dateStr = formatShortDateTime(el.datetime);
+    const labelContent = dateStr ? `${el.name}<br><small style="opacity: 0.8">${dateStr}</small>` : el.name;
 
     marker.bindTooltip(labelContent, {
         permanent: true,
@@ -618,15 +629,8 @@ function plotERB(data, shouldFly = true) {
         html: true
     });
 
-    marker.bindPopup(`<b>${data.name} (ERB)</b><br>Lat: ${data.lat}<br>Lng: ${data.lng}<br>Azimute: ${data.azimuth}°<br>Raio: ${data.radius}m${data.datetime ? '<br>Data: ' + dateStr : ''}`);
+    marker.bindPopup(buildErbPopup(el));
 
-    // 4. Store
-    const el = {
-        ...data,
-        layers: [sectorLayer],
-        marker: marker,
-        isTimeVisible: true
-    };
     plottedElements.push(el);
 
     updateElementMapVisibility(el);
@@ -654,37 +658,39 @@ function plotPOI(data, shouldFly = true) {
         }
     });
 
+    // 2. Store (created before the handlers so drag updates the stored element, not a stale copy)
+    const el = {
+        ...data,
+        marker: marker,
+        isTimeVisible: true
+    };
+
     // Draggable logic for POI
     marker.on('dragend', function (e) {
         const newLatLng = e.target.getLatLng();
-        data.lat = newLatLng.lat;
-        data.lng = newLatLng.lng;
+        el.lat = newLatLng.lat;
+        el.lng = newLatLng.lng;
 
         // Update form if this element is being edited
-        if (currentEditId === data.id) {
-            document.getElementById('poi-lat').value = data.lat.toFixed(6);
-            document.getElementById('poi-lng').value = data.lng.toFixed(6);
+        if (currentEditId === el.id) {
+            document.getElementById('poi-lat').value = el.lat.toFixed(6);
+            document.getElementById('poi-lng').value = el.lng.toFixed(6);
         }
 
+        marker.setPopupContent(buildPoiPopup(el));
         updateElementsList();
     });
 
-    // 2. Persistent Label
-    marker.bindTooltip(data.name, {
+    // 3. Persistent Label
+    marker.bindTooltip(el.name, {
         permanent: true,
         direction: 'top',
         className: 'custom-label',
         offset: [0, -25]
     });
 
-    marker.bindPopup(`<b>${data.name} (Ponto)</b><br>Lat: ${data.lat}<br>Lng: ${data.lng}`);
+    marker.bindPopup(buildPoiPopup(el));
 
-    // 3. Store
-    const el = {
-        ...data,
-        marker: marker,
-        isTimeVisible: true
-    };
     plottedElements.push(el);
 
     updateElementMapVisibility(el);
@@ -870,6 +876,7 @@ function editElement(id) {
         document.getElementById('beamwidth').value = el.beamwidth;
         document.getElementById('erb-color').value = el.color;
         document.getElementById('name').value = el.name;
+        document.getElementById('erb-datetime').value = toDatetimeLocalValue(el.datetime);
         erbForm.querySelector('.btn-primary').textContent = 'Atualizar ERB';
     } else {
         // Switch to POI tab
@@ -1080,13 +1087,10 @@ function parseDateRobust(val) {
     if (!val) return null;
     if (val instanceof Date) return val.getTime();
 
-    // Try native parsing (handles ISO)
-    const d = new Date(val);
-    if (!isNaN(d.getTime())) return d.getTime();
-
-    // Try Brazilian/Common format: DD/MM/YYYY HH:mm:ss or similar
+    // Brazilian format first (DD/MM/YYYY HH:mm:ss or similar). It must run before the
+    // native parser, which reads "05/09/2026" as May 9th instead of September 5th.
     if (typeof val === 'string') {
-        const parts = val.match(/(\d{2})\/(\d{2})\/(\d{4})(?:[^\d]+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+        const parts = val.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[^\d]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
         if (parts) {
             const day = parseInt(parts[1], 10);
             const month = parseInt(parts[2], 10) - 1;
@@ -1100,5 +1104,46 @@ function parseDateRobust(val) {
         }
     }
 
+    // Fallback to native parsing (handles ISO strings and Excel serial dates already converted)
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.getTime();
+
     return null;
+}
+
+// --- Helpers ---
+
+/** Returns the number itself when it is a valid number, otherwise "" (so 0 is preserved on export). */
+function numberOrEmpty(value) {
+    return (typeof value === 'number' && !isNaN(value)) ? value : "";
+}
+
+/** Parses a spreadsheet cell as a number; empty/missing/invalid cells become undefined instead of NaN. */
+function parseNumberOrUndefined(value) {
+    if (value === undefined || value === null || value === "") return undefined;
+    const n = parseFloat(value);
+    return isNaN(n) ? undefined : n;
+}
+
+/** Formats a timestamp as DD/MM HH:mm for labels and popups. Returns "" when there is no date. */
+function formatShortDateTime(timestamp) {
+    if (!timestamp) return '';
+    return new Date(timestamp).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Converts a timestamp to the "YYYY-MM-DDTHH:mm" local value expected by <input type="datetime-local">. */
+function toDatetimeLocalValue(timestamp) {
+    if (!timestamp) return '';
+    const d = new Date(timestamp);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function buildErbPopup(el) {
+    const dateStr = formatShortDateTime(el.datetime);
+    return `<b>${el.name} (ERB)</b><br>Lat: ${el.lat}<br>Lng: ${el.lng}<br>Azimute: ${el.azimuth}°<br>Raio: ${el.radius}m${dateStr ? '<br>Data: ' + dateStr : ''}`;
+}
+
+function buildPoiPopup(el) {
+    return `<b>${el.name} (Ponto)</b><br>Lat: ${el.lat}<br>Lng: ${el.lng}`;
 }
