@@ -45,6 +45,7 @@
         <div class="tabs" role="tablist">
             <button class="tab-btn active" data-tab="erb-tab" role="tab">ERBs</button>
             <button class="tab-btn" data-tab="poi-tab" role="tab">Pontos (POI)</button>
+            <button class="tab-btn" data-tab="analysis-tab" role="tab">Análise</button>
         </div>
 
         <!-- Aba ERB -->
@@ -137,6 +138,48 @@
             </form>
         </div>
 
+        <!-- Aba Análise de sobreposição -->
+        <div id="analysis-tab" class="tab-content" role="tabpanel">
+            <p class="tab-hint">A análise usa as ERBs e pontos visíveis no mapa. Use o slider temporal e os
+                botões de visibilidade da lista para escolher o conjunto.</p>
+            <p class="analysis-source" id="analysis-source">Nenhum setor visível.</p>
+
+            <div class="input-group">
+                <span class="input-label">1. Pontos dentro dos setores</span>
+                <button type="button" id="poi-check-btn" class="btn-action btn-block" title="Verifica, ponto a ponto, quais setores visíveis o contêm">
+                    <i class="fas fa-location-crosshairs"></i> Verificar pontos
+                </button>
+            </div>
+
+            <div class="input-group">
+                <span class="input-label">2. Interseção exata (polígono)</span>
+                <button type="button" id="intersect-btn" class="btn-action btn-block" title="Calcula a área comum a todos os setores visíveis">
+                    <i class="fas fa-draw-polygon"></i> Calcular área comum
+                </button>
+            </div>
+
+            <div class="input-group">
+                <span class="input-label">3. Mapa de cobertura (grade)</span>
+                <div class="input-row input-row-select">
+                    <select id="grid-cell-size" aria-label="Tamanho da célula">
+                        <option value="25">Célula 25 m</option>
+                        <option value="50" selected>Célula 50 m</option>
+                        <option value="100">Célula 100 m</option>
+                        <option value="200">Célula 200 m</option>
+                    </select>
+                    <button type="button" id="coverage-btn" class="btn-action" title="Conta quantos setores cobrem cada célula">
+                        <i class="fas fa-table-cells"></i> Gerar
+                    </button>
+                </div>
+            </div>
+
+            <div id="analysis-results" class="analysis-results hidden" aria-live="polite"></div>
+
+            <button type="button" id="clear-analysis-btn" class="btn-action btn-danger-outline btn-block">
+                <i class="fas fa-eraser"></i> Limpar análise
+            </button>
+        </div>
+
         <div class="action-buttons">
             <div class="row-single">
                 <button type="button" id="export-btn" class="btn-action" title="Baixar dados em Excel">
@@ -194,9 +237,19 @@
         <div class="slider-controls">
             <button id="slider-prev" title="Anterior" aria-label="Instante anterior"><i class="fas fa-chevron-left"></i></button>
             <div class="slider-info">
-                <span id="current-time-display">01/01/2026 00:00</span>
-                <input type="range" id="time-slider" min="0" max="0" value="0" aria-label="Instante selecionado">
-                <span class="slider-hint"><i class="fas fa-keyboard"></i> Use as setas ← → do teclado</span>
+                <div class="slider-top">
+                    <div class="slider-mode" role="group" aria-label="Modo do filtro temporal">
+                        <button type="button" class="mode-btn active" data-mode="instant" title="Mostra as ERBs de um único instante">Instante</button>
+                        <button type="button" class="mode-btn" data-mode="range" title="Mostra as ERBs entre dois instantes">Intervalo</button>
+                    </div>
+                    <span id="current-time-display">01/01/2026 00:00</span>
+                </div>
+                <div class="slider-track" id="slider-track">
+                    <div class="slider-track-fill" id="slider-track-fill"></div>
+                    <input type="range" id="time-slider" min="0" max="0" value="0" aria-label="Instante inicial">
+                    <input type="range" id="time-slider-end" min="0" max="0" value="0" aria-label="Instante final" class="hidden">
+                </div>
+                <span class="slider-hint"><i class="fas fa-keyboard"></i> Setas ← → movem o instante ou a janela; Shift + setas ajustam o fim</span>
             </div>
             <button id="slider-next" title="Próximo" aria-label="Próximo instante"><i class="fas fa-chevron-right"></i></button>
         </div>
@@ -236,6 +289,17 @@
                         padrão da ferramenta. Com o mapa vazio, o botão Exportar gera um modelo de planilha.</p>
                 </section>
                 <section>
+                    <h3><i class="fas fa-clock"></i> Slider Temporal</h3>
+                    <p>No modo <strong>Instante</strong>, apenas as ERBs do horário selecionado aparecem. No modo
+                        <strong>Intervalo</strong>, aparecem todas as ERBs entre o início e o fim escolhidos.</p>
+                </section>
+                <section>
+                    <h3><i class="fas fa-draw-polygon"></i> Análise de Sobreposição</h3>
+                    <p>A aba Análise verifica quais pontos caem dentro de quais setores, calcula o polígono comum
+                        a todos os setores visíveis com sua área e centróide, e gera um mapa de cobertura que conta
+                        quantos setores cobrem cada célula da grade.</p>
+                </section>
+                <section>
                     <h3><i class="fas fa-floppy-disk"></i> Recuperação Automática</h3>
                     <p>Os elementos plotados ficam guardados neste navegador e são restaurados ao reabrir a página.
                         Use <strong>Apagar tudo</strong> para descartá-los.</p>
@@ -259,6 +323,7 @@
 
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/sheetjs/xlsx.full.min.js"></script>
+    <script src="vendor/polygon-clipping/polygon-clipping.umd.min.js"></script>
     <script src="utils.js"></script>
     <script src="script.js"></script>
 </body>

@@ -16,7 +16,11 @@
         sanitizeColor,
         sanitizeIcon,
         formatDistance,
-        generateId
+        formatArea,
+        generateId,
+        pointInSector,
+        sectorsIntersection,
+        coverageGrid
     } = PlotadorUtils;
 
     const STORAGE_KEY = 'plotador_erb_ponto_state_v1';
@@ -58,8 +62,12 @@
     const map = L.map('map', {
         center: [-15.793889, -47.882778],
         zoom: 13,
-        layers: [googleRoadmap]
+        layers: [googleRoadmap],
+        zoomControl: false
     });
+
+    // Controles no canto inferior direito, fora da área dos painéis laterais
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     L.control.layers({
         'Google Roadmap': googleRoadmap,
@@ -68,7 +76,7 @@
         'OpenStreetMap': osmStandard,
         'CARTO Claro': cartoLight,
         'CARTO Escuro': cartoDark
-    }).addTo(map);
+    }, null, { position: 'bottomright' }).addTo(map);
 
     /**
      * Fallback automático: se uma camada do Google acumular erros de tile sem
@@ -108,7 +116,9 @@
     let currentEditId = null;
     let showAllTimestamps = false;
     let allLabelsVisible = true;
-    let currentSliderTimestamp = null;
+    let currentSliderTimestamp = null;   // início (ou instante único)
+    let rangeEndTimestamp = null;        // fim, usado no modo intervalo
+    let sliderMode = 'instant';          // 'instant' | 'range'
     let uniqueTimestamps = [];
 
     // Quando verdadeiro, plotERB/plotPOI não reconstroem a lista a cada chamada
@@ -142,6 +152,9 @@
     const measureBtn = $('measure-btn');
     const timeSliderContainer = $('time-slider-container');
     const timeSlider = $('time-slider');
+    const timeSliderEnd = $('time-slider-end');
+    const sliderTrackFill = $('slider-track-fill');
+    const sliderModeButtons = document.querySelectorAll('.slider-mode .mode-btn');
     const currentTimeDisplay = $('current-time-display');
     const sliderPrevBtn = $('slider-prev');
     const sliderNextBtn = $('slider-next');
@@ -358,6 +371,7 @@
         measurePoints = [];
         if (isMeasuring) stopMeasuring();
 
+        clearAnalysis();
         clearPersistedState();
     });
 
@@ -796,6 +810,7 @@
         }).join('');
 
         elementsList.innerHTML = html;
+        updateAnalysisSource();
         schedulePersist();
     }
 
@@ -937,8 +952,17 @@
     setLabelsVisible(true);
 
     // =========================================================================
-    // Slider temporal
+    // Slider temporal (instante único ou intervalo)
     // =========================================================================
+
+    function isElementShown(el) {
+        return el.isVisible && (el.isTimeVisible || showAllTimestamps);
+    }
+
+    function sliderIndexOf(timestamp, fallback) {
+        const idx = uniqueTimestamps.indexOf(timestamp);
+        return idx === -1 ? fallback : idx;
+    }
 
     function updateTemporalSlider() {
         uniqueTimestamps = [...new Set(
@@ -959,23 +983,48 @@
         timeSliderContainer.classList.remove('hidden');
         // Enquanto o slider está visível, as setas do teclado controlam o slider e não o mapa
         map.keyboard.disable();
-        timeSlider.max = uniqueTimestamps.length - 1;
+        const maxIndex = uniqueTimestamps.length - 1;
+        timeSlider.max = maxIndex;
+        timeSliderEnd.max = maxIndex;
 
-        if (currentSliderTimestamp === null || !uniqueTimestamps.includes(currentSliderTimestamp)) {
-            timeSlider.value = 0;
-            currentSliderTimestamp = uniqueTimestamps[0];
-        } else {
-            timeSlider.value = uniqueTimestamps.indexOf(currentSliderTimestamp);
-        }
+        const startIndex = sliderIndexOf(currentSliderTimestamp, 0);
+        let endIndex = sliderIndexOf(rangeEndTimestamp, maxIndex);
+        if (endIndex < startIndex) endIndex = startIndex;
+
+        timeSlider.value = startIndex;
+        timeSliderEnd.value = endIndex;
+        currentSliderTimestamp = uniqueTimestamps[startIndex];
+        rangeEndTimestamp = uniqueTimestamps[endIndex];
 
         updateSliderDisplay();
         filterElementsByTime();
     }
 
     function updateSliderDisplay() {
-        if (currentSliderTimestamp) {
+        if (!currentSliderTimestamp) return;
+        const maxIndex = Math.max(1, uniqueTimestamps.length - 1);
+        const startIndex = parseInt(timeSlider.value, 10);
+        const endIndex = parseInt(timeSliderEnd.value, 10);
+
+        if (sliderMode === 'range') {
+            const count = endIndex - startIndex + 1;
+            currentTimeDisplay.textContent =
+                `${formatFullDateTime(currentSliderTimestamp)} → ${formatFullDateTime(rangeEndTimestamp)} · ${count} instante${count > 1 ? 's' : ''}`;
+            const left = (startIndex / maxIndex) * 100;
+            const width = ((endIndex - startIndex) / maxIndex) * 100;
+            sliderTrackFill.style.left = `${left}%`;
+            sliderTrackFill.style.width = `${width}%`;
+        } else {
             currentTimeDisplay.textContent = formatFullDateTime(currentSliderTimestamp);
+            sliderTrackFill.style.width = '0';
         }
+    }
+
+    function isInTimeSelection(datetime) {
+        if (sliderMode === 'range') {
+            return datetime >= currentSliderTimestamp && datetime <= rangeEndTimestamp;
+        }
+        return datetime === currentSliderTimestamp;
     }
 
     function filterElementsByTime() {
@@ -983,20 +1032,20 @@
             if (el.type === 'POI' || el.datetime === null || showAllTimestamps) {
                 el.isTimeVisible = true;
             } else {
-                el.isTimeVisible = el.datetime === currentSliderTimestamp;
+                el.isTimeVisible = isInTimeSelection(el.datetime);
             }
             updateElementMapVisibility(el);
         });
         updateElementsList();
 
-        if (!showAllTimestamps) {
+        if (!showAllTimestamps && sliderMode === 'instant') {
             const visibleErb = plottedElements.find(el => el.type === 'ERB' && el.isTimeVisible && el.isVisible);
             if (visibleErb) map.panTo([visibleErb.lat, visibleErb.lng]);
         }
     }
 
     function updateElementMapVisibility(el) {
-        const shouldBeVisible = el.isVisible && (el.isTimeVisible || showAllTimestamps);
+        const shouldBeVisible = isElementShown(el);
         const layers = [...(el.layers || []), el.marker].filter(Boolean);
 
         layers.forEach(layer => {
@@ -1005,19 +1054,72 @@
         });
     }
 
-    function stepSlider(delta) {
-        const val = parseInt(timeSlider.value, 10);
-        const next = val + delta;
-        if (next < 0 || next > uniqueTimestamps.length - 1) return;
-        timeSlider.value = next;
-        timeSlider.dispatchEvent(new Event('input'));
-    }
-
-    timeSlider.addEventListener('input', () => {
-        currentSliderTimestamp = uniqueTimestamps[parseInt(timeSlider.value, 10)];
+    /** Aplica os índices dos cursores ao estado e refiltra o mapa. */
+    function applySliderIndexes(startIndex, endIndex) {
+        const maxIndex = uniqueTimestamps.length - 1;
+        startIndex = Math.min(Math.max(0, startIndex), maxIndex);
+        endIndex = Math.min(Math.max(startIndex, endIndex), maxIndex);
+        timeSlider.value = startIndex;
+        timeSliderEnd.value = endIndex;
+        currentSliderTimestamp = uniqueTimestamps[startIndex];
+        rangeEndTimestamp = uniqueTimestamps[endIndex];
         setShowAll(false);
         updateSliderDisplay();
         filterElementsByTime();
+    }
+
+    /**
+     * Desloca a seleção: no modo instante move o cursor; no modo intervalo move a
+     * janela inteira mantendo a largura, ou apenas o fim quando endOnly é verdadeiro.
+     */
+    function stepSlider(delta, endOnly = false) {
+        if (uniqueTimestamps.length < 2) return;
+        const maxIndex = uniqueTimestamps.length - 1;
+        let start = parseInt(timeSlider.value, 10);
+        let end = parseInt(timeSliderEnd.value, 10);
+
+        if (sliderMode === 'range' && endOnly) {
+            end += delta;
+            if (end < start || end > maxIndex) return;
+        } else if (sliderMode === 'range') {
+            const width = end - start;
+            start += delta;
+            if (start < 0 || start + width > maxIndex) return;
+            end = start + width;
+        } else {
+            start += delta;
+            if (start < 0 || start > maxIndex) return;
+            end = Math.max(end, start);
+        }
+        applySliderIndexes(start, end);
+    }
+
+    function setSliderMode(mode) {
+        sliderMode = mode === 'range' ? 'range' : 'instant';
+        sliderModeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === sliderMode));
+        timeSliderEnd.classList.toggle('hidden', sliderMode !== 'range');
+        if (uniqueTimestamps.length < 2) return;
+
+        let start = parseInt(timeSlider.value, 10);
+        let end = parseInt(timeSliderEnd.value, 10);
+        if (sliderMode === 'range' && end <= start) end = uniqueTimestamps.length - 1;
+        applySliderIndexes(start, end);
+    }
+
+    timeSlider.addEventListener('input', () => {
+        const start = parseInt(timeSlider.value, 10);
+        const end = sliderMode === 'range' ? Math.max(start, parseInt(timeSliderEnd.value, 10)) : start;
+        applySliderIndexes(start, end);
+    });
+
+    timeSliderEnd.addEventListener('input', () => {
+        const end = parseInt(timeSliderEnd.value, 10);
+        const start = Math.min(end, parseInt(timeSlider.value, 10));
+        applySliderIndexes(start, end);
+    });
+
+    sliderModeButtons.forEach(btn => {
+        btn.addEventListener('click', () => setSliderMode(btn.dataset.mode));
     });
 
     sliderPrevBtn.addEventListener('click', () => stepSlider(-1));
@@ -1045,7 +1147,262 @@
 
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
             e.preventDefault();
-            stepSlider(e.key === 'ArrowLeft' ? -1 : 1);
+            stepSlider(e.key === 'ArrowLeft' ? -1 : 1, e.shiftKey);
+        }
+    });
+
+    // =========================================================================
+    // Análise de sobreposição de setores
+    // =========================================================================
+
+    const analysisLayer = L.layerGroup().addTo(map);
+    let coverageOverlay = null;
+    const analysisResults = $('analysis-results');
+    const analysisSource = $('analysis-source');
+    const intersectBtn = $('intersect-btn');
+    const coverageBtn = $('coverage-btn');
+    const poiCheckBtn = $('poi-check-btn');
+    const clearAnalysisBtn = $('clear-analysis-btn');
+    const gridCellSizeSelect = $('grid-cell-size');
+    const INTERSECTION_COLOR = '#00e5ff';
+
+    function visibleSectors() {
+        return plottedElements.filter(el => el.type === 'ERB' && isElementShown(el));
+    }
+
+    function visiblePois() {
+        return plottedElements.filter(el => el.type === 'POI' && isElementShown(el));
+    }
+
+    function updateAnalysisSource() {
+        const sectors = visibleSectors().length;
+        const pois = visiblePois().length;
+        analysisSource.textContent = sectors === 0
+            ? 'Nenhum setor visível.'
+            : `${sectors} setor${sectors > 1 ? 'es' : ''} e ${pois} ponto${pois !== 1 ? 's' : ''} visíveis.`;
+    }
+
+    function showAnalysisResults(html) {
+        analysisResults.innerHTML = html;
+        analysisResults.classList.remove('hidden');
+    }
+
+    function clearVectorAnalysis() {
+        analysisLayer.clearLayers();
+    }
+
+    function clearCoverageOverlay() {
+        if (coverageOverlay) {
+            map.removeLayer(coverageOverlay);
+            coverageOverlay = null;
+        }
+    }
+
+    function clearAnalysis() {
+        clearVectorAnalysis();
+        clearCoverageOverlay();
+        analysisResults.innerHTML = '';
+        analysisResults.classList.add('hidden');
+    }
+
+    function formatLatLng(lat, lng) {
+        return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+
+    function highlightPoi(poi, color) {
+        L.circleMarker([poi.lat, poi.lng], {
+            radius: 14,
+            color,
+            weight: 2,
+            fillOpacity: 0.15,
+            interactive: false
+        }).addTo(analysisLayer);
+    }
+
+    // Abordagem 1: teste analítico ponto a ponto
+    poiCheckBtn.addEventListener('click', () => {
+        const sectors = visibleSectors();
+        const pois = visiblePois();
+        if (sectors.length === 0 || pois.length === 0) {
+            showToast('É preciso ao menos um setor e um ponto visíveis.');
+            return;
+        }
+
+        clearVectorAnalysis();
+        const rows = pois.map(poi => {
+            const containing = sectors.filter(sec => pointInSector(poi.lat, poi.lng, sec));
+            if (containing.length === sectors.length) highlightPoi(poi, '#34d399');
+            else if (containing.length > 0) highlightPoi(poi, DEFAULT_ERB_COLOR);
+            return { poi, containing };
+        });
+
+        const inAll = rows.filter(r => r.containing.length === sectors.length).length;
+        const html = `
+            <h4>Pontos dentro dos setores</h4>
+            <p class="muted">${sectors.length} setor${sectors.length > 1 ? 'es' : ''} verificado${sectors.length > 1 ? 's' : ''} · ${inAll} ponto${inAll !== 1 ? 's' : ''} dentro de todos.</p>
+            <table>
+                <thead><tr><th>Ponto</th><th>Setores</th><th class="num">Qtd.</th></tr></thead>
+                <tbody>
+                ${rows.map(r => {
+                    const names = r.containing.map(sec => escapeHtml(sec.name)).join(', ');
+                    const tag = r.containing.length === sectors.length
+                        ? '<span class="tag-all">todos</span>'
+                        : (r.containing.length === 0 ? '<span class="tag-none">nenhum</span>' : names);
+                    return `<tr>
+                        <td><button type="button" class="link-btn" data-focus="${escapeHtml(r.poi.id)}">${escapeHtml(r.poi.name)}</button></td>
+                        <td>${tag}${r.containing.length === sectors.length && sectors.length > 1 ? `<br><span class="muted">${names}</span>` : ''}</td>
+                        <td class="num">${r.containing.length}/${sectors.length}</td>
+                    </tr>`;
+                }).join('')}
+                </tbody>
+            </table>`;
+        showAnalysisResults(html);
+    });
+
+    // Abordagem 2: interseção vetorial (polygon-clipping)
+    intersectBtn.addEventListener('click', () => {
+        const sectors = visibleSectors();
+        if (sectors.length < 2) {
+            showToast('São necessários ao menos dois setores visíveis para calcular a área comum.');
+            return;
+        }
+        if (typeof polygonClipping === 'undefined') {
+            showToast('A biblioteca de recorte de polígonos não foi carregada.');
+            return;
+        }
+
+        clearVectorAnalysis();
+        const result = sectorsIntersection(sectors, polygonClipping, 60);
+
+        if (!result) {
+            showAnalysisResults(`
+                <h4>Interseção exata</h4>
+                <p>Os ${sectors.length} setores visíveis não têm área em comum.</p>
+                <p class="muted">Dica: use o mapa de cobertura para ver quantos setores cobrem cada região.</p>`);
+            return;
+        }
+
+        const polygon = L.polygon(result.polygons, {
+            color: INTERSECTION_COLOR,
+            weight: 2,
+            fillColor: INTERSECTION_COLOR,
+            fillOpacity: 0.35,
+            dashArray: '6, 6'
+        }).addTo(analysisLayer);
+
+        const centroidMarker = L.circleMarker([result.centroid.lat, result.centroid.lng], {
+            radius: 6,
+            color: '#ffffff',
+            fillColor: INTERSECTION_COLOR,
+            fillOpacity: 1,
+            weight: 2
+        }).addTo(analysisLayer);
+
+        const popupHtml = `<b>Área comum a ${sectors.length} setores</b><br>Área: ${formatArea(result.areaM2)}<br>Centróide: ${formatLatLng(result.centroid.lat, result.centroid.lng)}`;
+        polygon.bindPopup(popupHtml);
+        centroidMarker.bindPopup(popupHtml);
+
+        // Um ponto está na interseção exatamente quando está em todos os setores
+        const poisInside = visiblePois().filter(poi => sectors.every(sec => pointInSector(poi.lat, poi.lng, sec)));
+        poisInside.forEach(poi => highlightPoi(poi, '#34d399'));
+
+        map.fitBounds(polygon.getBounds(), { padding: [40, 40], maxZoom: 17 });
+
+        showAnalysisResults(`
+            <h4>Interseção exata</h4>
+            <p><strong>Setores:</strong> ${sectors.map(sec => escapeHtml(sec.name)).join(', ')}</p>
+            <p><strong>Área comum:</strong> ${formatArea(result.areaM2)}${result.polygons.length > 1 ? ` (${result.polygons.length} regiões)` : ''}</p>
+            <p><strong>Centróide:</strong> <button type="button" class="link-btn" data-fly="${result.centroid.lat},${result.centroid.lng}">${formatLatLng(result.centroid.lat, result.centroid.lng)}</button></p>
+            <p><strong>Pontos dentro da área:</strong> ${poisInside.length === 0 ? '<span class="tag-none">nenhum</span>' : poisInside.map(poi => `<button type="button" class="link-btn" data-focus="${escapeHtml(poi.id)}">${escapeHtml(poi.name)}</button>`).join(', ')}</p>`);
+    });
+
+    // Abordagem 3: grade de cobertura desenhada em canvas
+    function coverageColor(count, max) {
+        const t = max <= 1 ? 1 : (count - 1) / (max - 1);
+        const hue = 60 - 60 * t;        // amarelo (1 setor) até vermelho (todos)
+        const alpha = 0.35 + 0.45 * t;
+        return { css: `hsl(${hue}, 100%, 50%)`, hue, alpha };
+    }
+
+    function renderCoverageCanvas(grid) {
+        const canvas = document.createElement('canvas');
+        canvas.width = grid.cols;
+        canvas.height = grid.rows;
+        const ctx = canvas.getContext('2d');
+        const image = ctx.createImageData(grid.cols, grid.rows);
+        const data = image.data;
+
+        for (let r = 0; r < grid.rows; r++) {
+            const canvasRow = grid.rows - 1 - r; // linha 0 da grade é o sul; no canvas, o topo é o norte
+            for (let c = 0; c < grid.cols; c++) {
+                const count = grid.counts[r * grid.cols + c];
+                if (count === 0) continue;
+                const { hue, alpha } = coverageColor(count, grid.max);
+                // hsl(hue,100%,50%) em RGB para hue entre 0 e 60
+                const red = 255;
+                const green = Math.round(255 * (hue / 60));
+                const idx = (canvasRow * grid.cols + c) * 4;
+                data[idx] = red;
+                data[idx + 1] = green;
+                data[idx + 2] = 0;
+                data[idx + 3] = Math.round(alpha * 255);
+            }
+        }
+        ctx.putImageData(image, 0, 0);
+        return canvas;
+    }
+
+    coverageBtn.addEventListener('click', () => {
+        const sectors = visibleSectors();
+        if (sectors.length === 0) {
+            showToast('É preciso ao menos um setor visível para gerar o mapa de cobertura.');
+            return;
+        }
+
+        const cellSize = parseInt(gridCellSizeSelect.value, 10) || 50;
+        const grid = coverageGrid(sectors, cellSize);
+        clearCoverageOverlay();
+
+        const canvas = renderCoverageCanvas(grid);
+        const bounds = [[grid.bounds.south, grid.bounds.west], [grid.bounds.north, grid.bounds.east]];
+        coverageOverlay = L.imageOverlay(canvas.toDataURL('image/png'), bounds, {
+            opacity: 0.75,
+            interactive: false,
+            className: 'coverage-overlay'
+        }).addTo(map);
+        map.fitBounds(bounds, { padding: [40, 40] });
+
+        const legendRows = [];
+        for (let k = grid.max; k >= 1; k--) {
+            const area = grid.histogram[k] * grid.cellAreaM2;
+            if (grid.histogram[k] === 0) continue;
+            const { css, alpha } = coverageColor(k, grid.max);
+            legendRows.push(`<tr>
+                <td><span class="legend-swatch" style="background: ${css}; opacity: ${alpha.toFixed(2)}"></span>${k} setor${k > 1 ? 'es' : ''}${k === sectors.length && sectors.length > 1 ? ' <span class="tag-all">(todos)</span>' : ''}</td>
+                <td class="num">${formatArea(area)}</td>
+            </tr>`);
+        }
+
+        showAnalysisResults(`
+            <h4>Mapa de cobertura</h4>
+            <p class="muted">${sectors.length} setor${sectors.length > 1 ? 'es' : ''} · célula de ${grid.cellSizeM} m · ${grid.cols}×${grid.rows} células${grid.cellSizeM !== cellSize ? ' (célula ampliada para limitar o cálculo)' : ''}</p>
+            <table>
+                <thead><tr><th>Cobertura</th><th class="num">Área</th></tr></thead>
+                <tbody>${legendRows.join('')}</tbody>
+            </table>`);
+    });
+
+    clearAnalysisBtn.addEventListener('click', clearAnalysis);
+
+    // Links dentro dos resultados: focar ponto ou voar até coordenada
+    analysisResults.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-focus], button[data-fly]');
+        if (!button) return;
+        if (button.dataset.focus) {
+            focusElement(button.dataset.focus);
+        } else if (button.dataset.fly) {
+            const [lat, lng] = button.dataset.fly.split(',').map(parseFloat);
+            map.flyTo([lat, lng], 16);
         }
     });
 
