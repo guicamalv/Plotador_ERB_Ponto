@@ -249,6 +249,194 @@
         };
     }
 
+    // ---------------------------------------------------------------------
+    // Coordenadas: decimal, graus/minutos/segundos (GMS) e UTM
+    // ---------------------------------------------------------------------
+
+    /** Normaliza símbolos de grau/minuto/segundo e espaços de um texto de coordenada. */
+    function normalizeCoordText(str) {
+        return String(str ?? '')
+            .replace(/[º˚]/g, '°')
+            .replace(/[’′]/g, "'")
+            .replace(/[”″]/g, '"')
+            .replace(/''/g, '"')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    /**
+     * Interpreta UMA coordenada (latitude ou longitude) em decimal (ponto ou vírgula)
+     * ou GMS, com sinal ou letra de hemisfério (N, S, E/L, W/O). Devolve número ou undefined.
+     */
+    function parseSingleCoordinate(str, axis) {
+        const text = normalizeCoordText(str);
+        if (!text) return undefined;
+
+        // Decimal puro: -15.79, -15,79, 15.79S, S15.79
+        const dec = text.match(/^([NSEWLO])?\s*([-+]?\d+(?:[.,]\d+)?)\s*°?\s*([NSEWLO])?$/i);
+        if (dec) {
+            let value = parseFloat(dec[2].replace(',', '.'));
+            const hemi = (dec[1] || dec[3] || '').toUpperCase();
+            if (/[SWO]/.test(hemi)) value = -Math.abs(value);
+            else if (/[NEL]/.test(hemi)) value = Math.abs(value);
+            return isFinite(value) ? value : undefined;
+        }
+
+        // GMS: 15°47'38.0"S, 15 47 38 S, -15°47.633', S 15°47'38"
+        const dms = text.match(/^([NSEWLO])?\s*([-+])?\s*(\d{1,3})\s*[°\s]\s*(\d{1,2}(?:[.,]\d+)?)?\s*['\s]?\s*(\d{1,2}(?:[.,]\d+)?)?\s*"?\s*([NSEWLO])?$/i);
+        if (dms) {
+            const deg = parseFloat(dms[3]);
+            const min = dms[4] ? parseFloat(dms[4].replace(',', '.')) : 0;
+            const sec = dms[5] ? parseFloat(dms[5].replace(',', '.')) : 0;
+            if (min >= 60 || sec >= 60) return undefined;
+            let value = deg + min / 60 + sec / 3600;
+            const hemi = (dms[1] || dms[6] || '').toUpperCase();
+            if (dms[2] === '-' || /[SWO]/.test(hemi)) value = -value;
+            return isFinite(value) ? value : undefined;
+        }
+
+        return undefined;
+    }
+
+    function parseLatitude(str) {
+        const v = parseSingleCoordinate(str, 'lat');
+        return v === undefined || Math.abs(v) > 90 ? undefined : v;
+    }
+
+    function parseLongitude(str) {
+        const v = parseSingleCoordinate(str, 'lng');
+        return v === undefined || Math.abs(v) > 180 ? undefined : v;
+    }
+
+    // --- UTM (WGS84) ---
+    const UTM_A = 6378137;
+    const UTM_F = 1 / 298.257223563;
+    const UTM_K0 = 0.9996;
+
+    function utmBandLetter(lat) {
+        const letters = 'CDEFGHJKLMNPQRSTUVWX';
+        if (lat < -80 || lat > 84) return null;
+        return letters[Math.min(19, Math.floor((lat + 80) / 8))];
+    }
+
+    /** Converte lat/lng em UTM (zona, banda, hemisfério, leste e norte em metros). */
+    function latLngToUtm(lat, lng) {
+        const zone = Math.floor((lng + 180) / 6) + 1;
+        const e2 = UTM_F * (2 - UTM_F);
+        const ep2 = e2 / (1 - e2);
+        const phi = toRad(lat);
+        const lambda0 = toRad((zone - 1) * 6 - 180 + 3);
+        const N = UTM_A / Math.sqrt(1 - e2 * Math.sin(phi) ** 2);
+        const T = Math.tan(phi) ** 2;
+        const C = ep2 * Math.cos(phi) ** 2;
+        const A = Math.cos(phi) * (toRad(lng) - lambda0);
+        const M = UTM_A * (
+            (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256) * phi -
+            (3 * e2 / 8 + 3 * e2 ** 2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * phi) +
+            (15 * e2 ** 2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * phi) -
+            (35 * e2 ** 3 / 3072) * Math.sin(6 * phi));
+        const easting = UTM_K0 * N * (A + (1 - T + C) * A ** 3 / 6 +
+            (5 - 18 * T + T ** 2 + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+        let northing = UTM_K0 * (M + N * Math.tan(phi) * (A ** 2 / 2 +
+            (5 - T + 9 * C + 4 * C ** 2) * A ** 4 / 24 +
+            (61 - 58 * T + T ** 2 + 600 * C - 330 * ep2) * A ** 6 / 720));
+        const hemisphere = lat >= 0 ? 'N' : 'S';
+        if (lat < 0) northing += 10000000;
+        return { zone, band: utmBandLetter(lat), hemisphere, easting, northing };
+    }
+
+    /** Converte UTM em lat/lng. `hemisphere` aceita 'N'/'S' ou a letra da banda. */
+    function utmToLatLng(zone, hemisphere, easting, northing) {
+        const letter = String(hemisphere || 'S').toUpperCase();
+        const isNorth = letter === 'N' ? true : (letter === 'S' ? false : letter >= 'N');
+        const e2 = UTM_F * (2 - UTM_F);
+        const ep2 = e2 / (1 - e2);
+        const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+        const x = easting - 500000;
+        const y = isNorth ? northing : northing - 10000000;
+        const M = y / UTM_K0;
+        const mu = M / (UTM_A * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+        const phi1 = mu +
+            (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) +
+            (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu) +
+            (151 * e1 ** 3 / 96) * Math.sin(6 * mu) +
+            (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+        const N1 = UTM_A / Math.sqrt(1 - e2 * Math.sin(phi1) ** 2);
+        const T1 = Math.tan(phi1) ** 2;
+        const C1 = ep2 * Math.cos(phi1) ** 2;
+        const R1 = UTM_A * (1 - e2) / Math.pow(1 - e2 * Math.sin(phi1) ** 2, 1.5);
+        const D = x / (N1 * UTM_K0);
+        const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (D ** 2 / 2 -
+            (5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * ep2) * D ** 4 / 24 +
+            (61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * ep2 - 3 * C1 ** 2) * D ** 6 / 720);
+        const lng = (D - (1 + 2 * T1 + C1) * D ** 3 / 6 +
+            (5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * ep2 + 24 * T1 ** 2) * D ** 5 / 120) / Math.cos(phi1);
+        const lambda0 = (zone - 1) * 6 - 180 + 3;
+        return { lat: toDeg(lat), lng: lambda0 + toDeg(lng) };
+    }
+
+    /**
+     * Interpreta um par de coordenadas colado pelo usuário, em qualquer destes formatos:
+     *   -15.79, -47.88  |  -15,79 -47,88  |  15°47'38"S 47°52'58"W  |  23L 190000 8250000
+     *   23 L 190000 8250000  |  190000 8250000 23L  |  UTM 23S 190000 8250000
+     * Devolve { lat, lng } ou null.
+     */
+    function parseCoordinates(str) {
+        const text = normalizeCoordText(str).replace(/^utm\s*/i, '');
+        if (!text) return null;
+
+        // UTM: zona (1-60) + letra de banda ou hemisfério + leste + norte, em qualquer ordem comum
+        const utmA = text.match(/^(\d{1,2})\s*([C-HJ-NP-X])\s+(\d{6,7}(?:[.,]\d+)?)\s*[,;]?\s+(\d{6,8}(?:[.,]\d+)?)$/i);
+        const utmB = text.match(/^(\d{6,7}(?:[.,]\d+)?)\s*[,;]?\s+(\d{6,8}(?:[.,]\d+)?)\s+(\d{1,2})\s*([C-HJ-NP-X])$/i);
+        const utm = utmA ? { zone: utmA[1], band: utmA[2], e: utmA[3], n: utmA[4] }
+            : (utmB ? { zone: utmB[3], band: utmB[4], e: utmB[1], n: utmB[2] } : null);
+        if (utm) {
+            const zone = parseInt(utm.zone, 10);
+            if (zone < 1 || zone > 60) return null;
+            const result = utmToLatLng(zone, utm.band, parseFloat(utm.e.replace(',', '.')), parseFloat(utm.n.replace(',', '.')));
+            return isFinite(result.lat) && isFinite(result.lng) && Math.abs(result.lat) <= 90 ? result : null;
+        }
+
+        // Separa o par: por vírgula/ponto e vírgula (quando não é vírgula decimal), ou por espaço entre dois blocos
+        let parts = null;
+        if (/;/.test(text)) {
+            parts = text.split(';');
+        } else if (/,/.test(text) && !/^-?\d+,\d+\s+-?\d+,\d+$/.test(text)) {
+            parts = text.split(',');
+            // "15,79, -47,88" quebra em três; junta os pedaços quando vírgula é decimal
+            if (parts.length === 4) parts = [parts[0] + ',' + parts[1], parts[2] + ',' + parts[3]];
+        } else {
+            // Divide no espaço que separa dois blocos que contêm dígitos, respeitando letras de hemisfério
+            const m = text.match(/^(.*?[\d"'°][\s]*[NSEWLO]?)\s+([-+NSEWLO]?\s*\d.*)$/i);
+            if (m) parts = [m[1], m[2]];
+        }
+        if (!parts || parts.length !== 2) return null;
+
+        const lat = parseLatitude(parts[0]);
+        const lng = parseLongitude(parts[1]);
+        if (lat === undefined || lng === undefined) return null;
+        return { lat, lng };
+    }
+
+    /** Formata em graus, minutos e segundos com letras de hemisfério. */
+    function toDMS(lat, lng) {
+        const one = (value, pos, neg) => {
+            const abs = Math.abs(value);
+            const deg = Math.floor(abs);
+            const minFloat = (abs - deg) * 60;
+            const min = Math.floor(minFloat);
+            const sec = ((minFloat - min) * 60).toFixed(2);
+            return `${deg}°${String(min).padStart(2, '0')}'${sec.padStart(5, '0')}"${value < 0 ? neg : pos}`;
+        };
+        return `${one(lat, 'N', 'S')} ${one(lng, 'E', 'W')}`;
+    }
+
+    /** Formata em UTM: "23L 190123 8251234". */
+    function formatUtm(lat, lng) {
+        const u = latLngToUtm(lat, lng);
+        return `${u.zone}${u.band || u.hemisphere} ${Math.round(u.easting)} ${Math.round(u.northing)}`;
+    }
+
     /** Formata área em m² ou km² para exibição. */
     function formatArea(m2) {
         if (m2 >= 1e6) return (m2 / 1e6).toFixed(2) + ' km²';
@@ -376,6 +564,13 @@
         ringArea,
         ringCentroid,
         sectorsIntersection,
-        coverageGrid
+        coverageGrid,
+        parseLatitude,
+        parseLongitude,
+        parseCoordinates,
+        latLngToUtm,
+        utmToLatLng,
+        toDMS,
+        formatUtm
     };
 });
